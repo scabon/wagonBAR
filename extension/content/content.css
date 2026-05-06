@@ -1,6 +1,6 @@
 /* Content script styles for SNCF Voucher Reminder */
 
-/* Banner styles (these are mostly inline, but can be overridden) */
+/* Banner styles - these work with the inline styles in content.js */
 .sncf-voucher-banner .banner-content {
   padding: 12px;
   display: flex;
@@ -96,4 +96,21 @@
 
 .sncf-voucher-banner .manage-btn:hover {
   background: rgba(255,255,255,0.3);
+}
+
+/* Dark mode support for banner - matches system settings */
+@media (prefers-color-scheme: dark) {
+  /* Darken the banner gradient for dark mode */
+  .sncf-voucher-banner[style*="linear-gradient"] {
+    background: linear-gradient(135deg, #004488, #003366) !important;
+  }
+  
+  .sncf-voucher-banner .banner-text code {
+    background: rgba(0,0,0,0.3);
+  }
+  
+  .sncf-voucher-banner .banner-footer {
+    border-top: 1px solid rgba(0,0,0,0.3);
+    background: rgba(0,0,0,0.2);
+  }
 }

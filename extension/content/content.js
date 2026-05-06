@@ -89,13 +89,18 @@ function showVoucherReminder(vouchers) {
     `;
   }
   
-  // Style the banner
+  // Style the banner - check for dark mode preference
+  const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const bannerGradient = isDarkMode 
+    ? 'linear-gradient(135deg, #004488, #003366)' 
+    : 'linear-gradient(135deg, #0066cc, #0052a3)';
+  
   banner.style.cssText = `
     position: fixed;
     bottom: 20px;
     right: 20px;
     max-width: 400px;
-    background: linear-gradient(135deg, #0066cc, #0052a3);
+    background: ${bannerGradient};
     color: white;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
