@@ -7,13 +7,13 @@ function getOldestValidVoucher() {
     const vouchers = data.vouchers || [];
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    
+
     // Filter valid vouchers and sort by expiry date (oldest first)
     const validVouchers = vouchers.filter(v => {
       const expiryDate = new Date(v.expiryDate);
       return expiryDate >= now;
     }).sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
-    
+
     return validVouchers.length > 0 ? validVouchers[0] : null;
   });
 }
@@ -24,7 +24,7 @@ function getValidVouchers() {
     const vouchers = data.vouchers || [];
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    
+
     return vouchers.filter(v => {
       const expiryDate = new Date(v.expiryDate);
       return expiryDate >= now;
@@ -35,11 +35,11 @@ function getValidVouchers() {
 // Check if current tab is SNCF Connect
 function isSNCFConnectTab(tab) {
   if (!tab || !tab.url) return false;
-  
+
   try {
     const url = new URL(tab.url);
-    return url.hostname.includes('sncf-connect.com') || 
-           url.hostname.includes('www.sncf-connect.com');
+    return url.hostname === 'sncf-connect.com' ||
+           url.hostname === 'www.sncf-connect.com';
   } catch (e) {
     return false;
   }
@@ -53,17 +53,24 @@ browser.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     });
     return true; // Required for async response
   }
-  
+
   if (request.action === 'getValidVouchers') {
     getValidVouchers().then(function(vouchers) {
       sendResponse({ vouchers: vouchers });
     });
     return true;
   }
+
+  if (request.action === 'openPopup') {
+    browser.action.openPopup().catch(function(e) {
+      // openPopup can fail (e.g. without user interaction); ignore
+      console.log('Could not open popup:', e);
+    });
+  }
 });
 
-// Optionally: Check on tab update if it's SNCF Connect
-// This could trigger a reminder notification
+// Check on tab update if it's SNCF Connect
+// This triggers a reminder banner for already-loaded tabs
 browser.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
   if (changeInfo.status === 'complete' && isSNCFConnectTab(tab)) {
     // Check if we should show a reminder
