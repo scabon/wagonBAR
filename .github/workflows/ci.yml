@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: web-ext lint
+        # exits non-zero on errors; warnings are reported but tolerated
+        run: npx --yes web-ext lint --source-dir extension
+
+  e2e:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install marionette_driver
+        run: pip install marionette_driver
+
+      - name: Ensure Firefox is on PATH
+        shell: pwsh
+        run: |
+          if (-not (Get-Command firefox.exe -ErrorAction SilentlyContinue)) {
+            winget install --id Mozilla.Firefox --silent --accept-source-agreements --accept-package-agreements
+          }
+          (Get-Command firefox.exe).Source
+
+      - name: Phase A - install, no-voucher banner, popup logic
+        run: python -X utf8 tests/e2e/wagonbar_e2e.py a
+
+      - name: Phase B - seeded storage, banner, manage tab
+        run: python -X utf8 tests/e2e/wagonbar_e2e.py b

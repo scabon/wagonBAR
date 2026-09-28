@@ -9,7 +9,7 @@ function checkAndShowReminder() {
   if (!isSNCFConnectPage()) {
     return;
   }
-  
+
   // Ask background script for valid vouchers
   browser.runtime.sendMessage({ action: 'getValidVouchers' }).then(function(response) {
     if (response && response.vouchers && response.vouchers.length > 0) {
@@ -24,11 +24,19 @@ function checkAndShowReminder() {
 function isSNCFConnectPage() {
   try {
     const hostname = window.location.hostname;
-    return hostname.includes('sncf-connect.com') || 
-           hostname.includes('www.sncf-connect.com');
+    return hostname === 'sncf-connect.com' ||
+           hostname === 'www.sncf-connect.com';
   } catch (e) {
     return false;
   }
+}
+
+// Create an element with optional class and text
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
 }
 
 // Show voucher reminder banner
@@ -37,64 +45,70 @@ function showVoucherReminder(vouchers) {
   if (document.getElementById('sncf-voucher-reminder')) {
     return;
   }
-  
+
   // Get the oldest voucher (first in sorted list)
   const oldestVoucher = vouchers[0];
   const voucherCount = vouchers.length;
-  
+
   // Format expiry date
   const expiryDate = new Date(oldestVoucher.expiryDate);
   const daysLeft = Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
   const expiryDateStr = formatDate(expiryDate);
-  
-  // Create reminder banner
-  const banner = document.createElement('div');
-  banner.id = 'sncf-voucher-reminder';
-  banner.className = 'sncf-voucher-banner';
-  
+
   // Check if we're on a page where vouchers can be used (booking page)
   const isBookingPage = isBookingPageUrl();
-  
+
+  // Create reminder banner
+  const banner = el('div');
+  banner.id = 'sncf-voucher-reminder';
+  banner.className = 'sncf-voucher-banner';
+
+  const content = el('div', 'banner-content');
+  content.appendChild(el('div', 'banner-icon', '🎫'));
+
+  const text = el('div', 'banner-text');
+  text.appendChild(el('strong', null,
+    `You have ${voucherCount} valid SNCF voucher${voucherCount > 1 ? 's' : ''}!`));
+
+  const oldestLine = el('p');
+  oldestLine.appendChild(document.createTextNode('Oldest: '));
+  const codeNode = el('code', null, oldestVoucher.code);
+  oldestLine.appendChild(codeNode);
   if (isBookingPage) {
-    // On booking page - suggest using the voucher
-    banner.innerHTML = `
-      <div class="banner-content">
-        <div class="banner-icon">🎫</div>
-        <div class="banner-text">
-          <strong>You have ${voucherCount} valid SNCF voucher${voucherCount > 1 ? 's' : ''}!</strong>
-          <p>Oldest: <code>${oldestVoucher.code}</code> (expires ${expiryDateStr}, ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left)</p>
-          <p class="banner-hint">Don't forget to apply it before paying!</p>
-        </div>
-        <button class="banner-close" title="Close">×</button>
-      </div>
-      <div class="banner-footer">
-        <button class="banner-btn copy-btn" data-code="${oldestVoucher.code}">Copy Code</button>
-        <button class="banner-btn manage-btn">Manage Vouchers</button>
-      </div>
-    `;
+    oldestLine.appendChild(document.createTextNode(
+      ` (expires ${expiryDateStr}, ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left)`));
   } else {
-    // On other pages - just remind
-    banner.innerHTML = `
-      <div class="banner-content">
-        <div class="banner-icon">🎫</div>
-        <div class="banner-text">
-          <strong>You have ${voucherCount} valid SNCF voucher${voucherCount > 1 ? 's' : ''}!</strong>
-          <p>Oldest: <code>${oldestVoucher.code}</code> (expires ${expiryDateStr})</p>
-        </div>
-        <button class="banner-close" title="Close">×</button>
-      </div>
-      <div class="banner-footer">
-        <button class="banner-btn manage-btn">Manage Vouchers</button>
-      </div>
-    `;
+    oldestLine.appendChild(document.createTextNode(` (expires ${expiryDateStr})`));
   }
-  
+  text.appendChild(oldestLine);
+
+  if (isBookingPage) {
+    text.appendChild(el('p', 'banner-hint', "Don't forget to apply it before paying!"));
+  }
+
+  content.appendChild(text);
+
+  const closeBtn = el('button', 'banner-close', '×');
+  closeBtn.title = 'Close';
+  content.appendChild(closeBtn);
+
+  banner.appendChild(content);
+
+  const footer = el('div', 'banner-footer');
+  if (isBookingPage) {
+    const copyBtn = el('button', 'banner-btn copy-btn', 'Copy Code');
+    copyBtn.setAttribute('data-code', oldestVoucher.code);
+    footer.appendChild(copyBtn);
+  }
+  footer.appendChild(el('button', 'banner-btn manage-btn', 'Manage Vouchers'));
+  banner.appendChild(footer);
+
   // Style the banner - check for dark mode preference
   const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const bannerGradient = isDarkMode 
-    ? 'linear-gradient(135deg, #004488, #003366)' 
+  const bannerGradient = isDarkMode
+    ? 'linear-gradient(135deg, #004488, #003366)'
     : 'linear-gradient(135deg, #0066cc, #0052a3)';
-  
+
   banner.style.cssText = `
     position: fixed;
     bottom: 20px;
@@ -109,22 +123,19 @@ function showVoucherReminder(vouchers) {
     font-size: 14px;
     overflow: hidden;
   `;
-  
+
   // Add to body
   document.body.appendChild(banner);
-  
+
   // Add event listeners
-  const closeBtn = banner.querySelector('.banner-close');
-  const copyBtn = banner.querySelector('.copy-btn');
-  const manageBtn = banner.querySelector('.manage-btn');
-  
   closeBtn.addEventListener('click', function() {
     banner.remove();
   });
-  
+
+  const copyBtn = banner.querySelector('.copy-btn');
   if (copyBtn) {
     copyBtn.addEventListener('click', function() {
-      const code = this.getAttribute('data-code');
+      const code = copyBtn.getAttribute('data-code');
       copyToClipboard(code);
       // Show feedback
       const originalText = copyBtn.textContent;
@@ -134,20 +145,21 @@ function showVoucherReminder(vouchers) {
       }, 2000);
     });
   }
-  
-  manageBtn.addEventListener('click', function() {
-    // Open the extension popup
+
+  banner.querySelector('.manage-btn').addEventListener('click', function() {
+    // Open the manage page in a new tab
     browser.runtime.sendMessage({ action: 'openPopup' });
     banner.remove();
   });
-  
-  // Auto-close after 30 seconds if not interacted with
+
+  // Dim after 20 seconds if not interacted with
   setTimeout(() => {
     if (banner.parentNode) {
       banner.style.opacity = '0.8';
     }
   }, 20000);
-  
+
+  // Auto-close after 30 seconds
   setTimeout(() => {
     if (banner.parentNode) {
       banner.remove();
@@ -167,7 +179,7 @@ function isBookingPageUrl() {
     '/paiement',
     '/payment'
   ];
-  
+
   return bookingPaths.some(p => path.toLowerCase().includes(p));
 }
 
@@ -179,14 +191,14 @@ function copyToClipboard(text) {
   textarea.style.opacity = '0';
   document.body.appendChild(textarea);
   textarea.select();
-  
+
   try {
     document.execCommand('copy');
   } catch (e) {
     // Fallback for modern browsers
     navigator.clipboard.writeText(text).catch(() => {});
   }
-  
+
   document.body.removeChild(textarea);
 }
 

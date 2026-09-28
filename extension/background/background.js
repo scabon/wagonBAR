@@ -62,10 +62,12 @@ browser.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   }
 
   if (request.action === 'openPopup') {
-    browser.action.openPopup().catch(function(e) {
-      // openPopup can fail (e.g. without user interaction); ignore
-      console.log('Could not open popup:', e);
-    });
+    // Open the manage page in a new tab (action.openPopup is
+    // restricted to user-gesture contexts and often unavailable)
+    browser.tabs.create({ url: browser.runtime.getURL('popup/popup.html') })
+      .catch(function(e) {
+        console.log('Could not open manage page:', e);
+      });
   }
 });
 

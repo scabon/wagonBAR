@@ -209,3 +209,28 @@ input[type="date"]:focus {
 .voucher-list::-webkit-scrollbar-thumb:hover {
   background: #999;
 }
+
+.btn-danger.confirm {
+  background-color: #8a1420;
+}
+
+.status-message {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.status-message.error {
+  background-color: #fdecea;
+  color: #c0392b;
+  border: 1px solid #f5c6cb;
+}
+
+@media (prefers-color-scheme: dark) {
+  .status-message.error {
+    background-color: #3a1a1a;
+    color: #ff8f8f;
+    border-color: #5c2a2a;
+  }
+}

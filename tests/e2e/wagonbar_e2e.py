@@ -215,6 +215,8 @@ def pstate(s):
         " empty: document.getElementById('voucherList').innerText.trim(),"
         " alerts: JSON.parse(document.documentElement.getAttribute('data-e2e-alerts') || '[]'),"
         " confirms: JSON.parse(document.documentElement.getAttribute('data-e2e-confirms') || '[]'),"
+        " status: (function(){ var s = document.getElementById('statusMessage');"
+        "          return { hidden: s.hidden, text: s.textContent }; })(),"
         " store: JSON.parse(document.documentElement.getAttribute('data-e2e-store') || '[]')"
         "});"
     ))
@@ -254,6 +256,14 @@ def popup_tests(s):
               st["total"] == "0" and st["valid"] == "0"
               and "No vouchers yet" in st["empty"], st["empty"])
 
+        popup_add(s, "", "")  # empty fields -> inline error, no native alert
+        time.sleep(0.5)
+        st = pstate(s)
+        check("popup: empty submit shows inline error, no native dialog",
+              not st["status"]["hidden"]
+              and "fill in both fields" in st["status"]["text"]
+              and st["alerts"] == [] and st["confirms"] == [], st["status"])
+
         popup_add(s, "E2E-FUTURE-999", "2028-06-30")
         popup_add(s, "E2E-SOON-111", "2026-10-05")
         popup_add(s, "E2E-EXPIRED-1", "2020-01-01")
@@ -276,8 +286,18 @@ def popup_tests(s):
         popup_add(s, "E2E-SOON-111", "2027-01-01")  # duplicate code
         time.sleep(0.8)
         st = pstate(s)
-        check("popup: duplicate code rejected with alert, nothing added",
-              len(st["items"]) == 3 and "already exists" in " ".join(st["alerts"]), st["alerts"])
+        check("popup: duplicate code rejected inline, nothing added",
+              len(st["items"]) == 3 and not st["status"]["hidden"]
+              and "already exists" in st["status"]["text"]
+              and st["alerts"] == [], (st["status"], st["alerts"]))
+
+        # delete is a two-step action: first click arms the button
+        s.page_js("document.querySelector('.voucher-item .delete-btn').click(); return 'ok';")
+        time.sleep(0.4)
+        st = pstate(s)
+        check("popup: first delete click arms confirm state, no native dialog",
+              len(st["items"]) == 3 and "Confirm?" in st["items"][0]["text"]
+              and st["confirms"] == [], st["items"][0]["text"])
 
         s.page_js("document.querySelector('.voucher-item .delete-btn').click(); return 'ok';")
         gone = False
@@ -288,9 +308,10 @@ def popup_tests(s):
                 break
             time.sleep(0.4)
         store_codes = [v["code"] for v in st["store"]]
-        check("popup: delete removes voucher after confirm, list re-renders",
+        check("popup: second click deletes voucher, list re-renders",
               gone and store_codes == ["E2E-SOON-111", "E2E-FUTURE-999"]
-              and st["confirms"] != [], (store_codes, st["confirms"]))
+              and st["confirms"] == [] and st["alerts"] == [],
+              (store_codes, st["confirms"], st["alerts"]))
     finally:
         if httpd:
             httpd.shutdown()
@@ -358,6 +379,37 @@ def phase_b():
                 break
             time.sleep(0.3)
         check("banner close button removes banner", gone)
+
+        # Manage Vouchers opens the manage page in a new tab
+        handles_before = set(s.client.window_handles)
+        s.client.navigate(SITE)
+        banner = None
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            banner = banner_text(s)
+            if banner and not str(banner).startswith("ERR:"):
+                break
+            time.sleep(1)
+        s.page_js(
+            "var b = document.getElementById('sncf-voucher-reminder');"
+            "if (b) b.querySelector('.manage-btn').click(); return 'ok';"
+        )
+        new_handle = None
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            new_handles = set(s.client.window_handles) - handles_before
+            if new_handles:
+                new_handle = sorted(new_handles)[0]
+                break
+            time.sleep(0.5)
+        check("Manage Vouchers opens a new tab", new_handle is not None,
+              sorted(set(s.client.window_handles) - handles_before))
+        if new_handle:
+            s.client.switch_to_window(new_handle)
+            manage_url = s.client.get_url()
+            check("new tab is the extension manage page",
+                  manage_url.startswith(s.base) and manage_url.endswith("popup/popup.html"),
+                  manage_url)
     finally:
         s.close()
 

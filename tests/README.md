@@ -27,13 +27,15 @@ first storage access and therefore needs a fresh session.
 What is covered:
 
 - MV3 manifest accepted and add-on installed
-- popup.js logic end to end (add, sort, duplicate, delete, counts,
-  expired/valid classes, date rendering) — in a localhost-served copy of
-  popup.html with a mocked `browser.storage` (Firefox blocks automation of
-  real extension pages)
+- popup.js logic end to end (add, sort, duplicate, inline error status,
+  two-step delete, counts, expired/valid classes, date rendering) — in a
+  localhost-served copy of popup.html with a mocked `browser.storage`
+  (Firefox blocks automation of real extension pages); asserts that no
+  native `alert`/`confirm` dialogs are used
 - content script on the real https://www.sncf-connect.com/: no banner with no
   vouchers, banner showing the oldest valid voucher (expired filtered out)
-  with correct count and date, close button
+  with correct count and date, close button, and "Manage Vouchers" opening
+  the manage page in a new tab
 
 Not covered: the toolbar popup panel itself (not automatable), the booking-page
 "Copy Code" banner variant (no stable booking URL), clipboard writes.

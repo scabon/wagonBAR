@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SNCF Voucher Reminder",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Manage SNCF Connect vouchers and get reminders when you have valid vouchers to use",
   "icons": {
     "48": "icons/icon-48.svg",
@@ -21,19 +21,36 @@
   ],
   "content_scripts": [
     {
-      "matches": ["*://www.sncf-connect.com/*", "*://sncf-connect.com/*"],
-      "js": ["content/content.js"],
-      "css": ["content/content.css"],
+      "matches": [
+        "*://www.sncf-connect.com/*",
+        "*://sncf-connect.com/*"
+      ],
+      "js": [
+        "content/content.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
       "run_at": "document_end"
     }
   ],
   "background": {
-    "scripts": ["background/background.js"]
+    "scripts": [
+      "background/background.js"
+    ]
   },
   "browser_specific_settings": {
     "gecko": {
       "id": "wagonbar@scabon.com",
-      "strict_min_version": "121.0"
+      "strict_min_version": "141.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      },
+      "android": {
+        "strict_max_version": "79.0"
+      }
     }
   }
 }
