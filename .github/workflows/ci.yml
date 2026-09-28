@@ -27,13 +27,24 @@ jobs:
       - name: Install marionette_driver
         run: pip install marionette_driver
 
-      - name: Ensure Firefox is on PATH
+      - name: Locate Firefox
         shell: pwsh
         run: |
-          if (-not (Get-Command firefox.exe -ErrorAction SilentlyContinue)) {
+          $ff = (Get-Command firefox.exe -ErrorAction SilentlyContinue).Source
+          if (-not $ff) {
+            $ff = "C:\Program Files\Mozilla Firefox\firefox.exe"
+          }
+          if (-not (Test-Path $ff)) {
             winget install --id Mozilla.Firefox --silent --accept-source-agreements --accept-package-agreements
           }
-          (Get-Command firefox.exe).Source
+          if (-not (Test-Path $ff)) {
+            # winget may have installed a new major version path
+            $ff = Get-ChildItem "C:\Program Files\Mozilla Firefox*\firefox.exe" -ErrorAction SilentlyContinue |
+                  Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $ff -or -not (Test-Path $ff)) { throw "firefox.exe not found" }
+          Write-Output "Firefox: $ff"
+          "FIREFOX_BIN=$ff" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Phase A - install, no-voucher banner, popup logic
         run: python -X utf8 tests/e2e/wagonbar_e2e.py a
