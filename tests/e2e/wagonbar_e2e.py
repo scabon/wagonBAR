@@ -1,0 +1,381 @@
+"""End-to-end tests for the SNCF Voucher Reminder Firefox extension.
+
+Drives a real headless Firefox via Marionette, installs the extension as a
+temporary add-on, and verifies the full stack: manifest load, popup logic
+(real popup.js against a mocked browser.storage), storage backend, content
+script and reminder banner on https://www.sncf-connect.com/.
+
+Usage:
+    python tests/e2e/wagonbar_e2e.py a    # install + no-vouchers banner + popup logic
+    python tests/e2e/wagonbar_e2e.py b    # seeded storage + banner + close button
+
+Requires:
+    - Firefox 121+ (Manifest V3 background event page) reachable as
+      ``firefox.exe`` on PATH or by full path via the FIREFOX_BIN env var
+    - ``pip install marionette_driver``
+    - pwsh (PowerShell 7) for orphan-process cleanup on Windows
+
+Notes:
+    - Each phase launches its own disposable Firefox profile and cleans up
+      afterwards; only headless instances started with -marionette are ever
+      killed (the user's own Firefox is never touched).
+    - The popup is tested in a localhost-served copy of popup.html with a
+      shim for browser.storage because Firefox blocks automation of real
+      extension pages (privileged browsing context).
+    - Phase B seeds browser.storage.local by writing the extension's
+      storage.js JSON file directly (legacy backend forced via
+      extensions.webextensions.ExtensionStorageIDB.enabled=false, set before
+      install); the backend caches after first read, so per-scenario storage
+      changes require a fresh browser session.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import zipfile
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from socketserver import ThreadingMixIn
+
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+EXT_DIR = os.path.join(REPO, "extension")
+POPUP_DIR = os.path.join(EXT_DIR, "popup")
+ADDON_ID = "wagonbar@scabon.com"
+SITE = "https://www.sncf-connect.com/"
+IDB_PREF = "extensions.webextensions.ExtensionStorageIDB.enabled"
+FIREFOX_BIN = os.environ.get("FIREFOX_BIN", "firefox.exe")
+RESULTS = []
+
+
+def check(name, cond, detail=""):
+    RESULTS.append((name, bool(cond)))
+    line = ("PASS " if cond else "FAIL ") + name
+    if detail:
+        line += "  | " + str(detail)
+    print(line, flush=True)
+
+
+def build_xpi():
+    xpi = os.path.join(tempfile.gettempdir(), "wagonbar-e2e-%d.xpi" % os.getpid())
+    with zipfile.ZipFile(xpi, "w", zipfile.ZIP_DEFLATED) as z:
+        for root, dirs, files in os.walk(EXT_DIR):
+            for f in files:
+                full = os.path.join(root, f)
+                z.write(full, os.path.relpath(full, EXT_DIR).replace("\\", "/"))
+    return xpi
+
+
+def kill_orphan_ff():
+    # only headless instances started with -marionette (ours), never the user's browser
+    if os.name != "nt":
+        return
+    subprocess.run(
+        ["pwsh", "-NoProfile", "-Command",
+         "Get-CimInstance Win32_Process -Filter \"Name='firefox.exe'\" | "
+         "Where-Object { $_.CommandLine -like '*-marionette*' } | "
+         "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"],
+        capture_output=True, timeout=60)
+
+
+class Session:
+    def __init__(self, seed_vouchers=None):
+        self.profile = tempfile.mkdtemp(prefix="wagonbar-ff-e2e-")
+        self.xpi = build_xpi()
+        self.proc = subprocess.Popen(
+            [FIREFOX_BIN, "-marionette", "-headless", "-no-remote",
+             "-profile", self.profile, "-remote-allow-system-access"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        from marionette_driver.marionette import Marionette
+        from marionette_driver.addons import Addons
+        self.client = None
+        last = None
+        for _ in range(60):
+            try:
+                self.client = Marionette(host="127.0.0.1", port=2828)
+                self.client.start_session()
+                break
+            except Exception as e:
+                last = e
+                self.client = None
+                time.sleep(0.5)
+        if self.client is None:
+            raise RuntimeError("marionette session failed: %s" % last)
+        # force the legacy JSONFile storage backend so storage.js seeding works
+        self.client.set_pref(IDB_PREF, False)
+        if seed_vouchers is not None:
+            d = os.path.join(self.profile, "browser-extension-data", ADDON_ID)
+            os.makedirs(d, exist_ok=True)
+            with open(os.path.join(d, "storage.js"), "w", encoding="utf-8") as fh:
+                fh.write(json.dumps({"vouchers": seed_vouchers}))
+        self.addon_id = Addons(self.client).install(self.xpi, temp=True)
+        self.base = None
+        for _ in range(20):
+            raw = self.client.get_pref("extensions.webextensions.uuids")
+            if raw:
+                uuids = json.loads(raw)
+                if ADDON_ID in uuids:
+                    self.base = "moz-extension://" + uuids[ADDON_ID] + "/"
+                    break
+            time.sleep(0.5)
+
+    def page_js(self, js):
+        return self.client.execute_script(js)
+
+    def close(self):
+        try:
+            self.client.quit()
+        except Exception:
+            pass
+        try:
+            self.proc.terminate()
+            self.proc.wait(timeout=10)
+        except Exception:
+            try:
+                self.proc.kill()
+            except Exception:
+                pass
+        kill_orphan_ff()
+        shutil.rmtree(self.profile, ignore_errors=True)
+        try:
+            os.remove(self.xpi)
+        except OSError:
+            pass
+
+
+def wait_page_ready(s, timeout=60):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            if s.page_js("return document.readyState === 'complete';") is True:
+                return True
+        except Exception:
+            pass
+        time.sleep(0.5)
+    return False
+
+
+def banner_text(s):
+    try:
+        return s.page_js(
+            "var b = document.getElementById('sncf-voucher-reminder');"
+            "return b ? b.innerText.replace(/\\s+/g, ' ') : null;"
+        )
+    except Exception as e:
+        return "ERR:" + str(e)
+
+
+SHIM = """
+(function(){
+  var root = document.documentElement;
+  var store = {vouchers: []};
+  var alerts = [];
+  var confirms = [];
+  function sync(){
+    root.setAttribute('data-e2e-store', JSON.stringify(store.vouchers));
+    root.setAttribute('data-e2e-alerts', JSON.stringify(alerts));
+    root.setAttribute('data-e2e-confirms', JSON.stringify(confirms));
+  }
+  window.alert = function(m){ alerts.push(String(m)); sync(); };
+  window.confirm = function(){ confirms.push('called'); sync(); return true; };
+  window.browser = {storage: {local: {
+    get: function(k){ return Promise.resolve(JSON.parse(JSON.stringify(store))); },
+    set: function(obj){ Object.assign(store, JSON.parse(JSON.stringify(obj)));
+                        sync(); return Promise.resolve(); }
+  }}};
+  sync();
+})();
+"""
+
+
+def build_popup_test_page(port):
+    d = tempfile.mkdtemp(prefix="wagonbar-popup-test-")
+    for f in ("popup.css", "popup.js"):
+        shutil.copy(os.path.join(POPUP_DIR, f), os.path.join(d, f))
+    html = open(os.path.join(POPUP_DIR, "popup.html"), encoding="utf-8").read()
+    shim_tag = "<script>%s</script>" % SHIM
+    html = html.replace("<script src=\"popup.js\"></script>",
+                        shim_tag + "\n  <script src=\"popup.js\"></script>")
+    with open(os.path.join(d, "test-popup.html"), "w", encoding="utf-8") as fh:
+        fh.write(html)
+    return d, "http://127.0.0.1:%d/test-popup.html" % port
+
+
+def pstate(s):
+    return json.loads(s.page_js(
+        "return JSON.stringify({"
+        " items: Array.from(document.querySelectorAll('.voucher-item')).map(function(e)"
+        "   {return {cls: e.className, text: e.innerText.replace(/\\s+/g,' ').trim()};}),"
+        " total: document.getElementById('totalVouchers').textContent,"
+        " valid: document.getElementById('validVouchers').textContent,"
+        " empty: document.getElementById('voucherList').innerText.trim(),"
+        " alerts: JSON.parse(document.documentElement.getAttribute('data-e2e-alerts') || '[]'),"
+        " confirms: JSON.parse(document.documentElement.getAttribute('data-e2e-confirms') || '[]'),"
+        " store: JSON.parse(document.documentElement.getAttribute('data-e2e-store') || '[]')"
+        "});"
+    ))
+
+
+def popup_add(s, code, date):
+    s.page_js(
+        "document.getElementById('voucherCode').value = %s;"
+        "document.getElementById('expiryDate').value = %s;"
+        "document.getElementById('addVoucherForm').dispatchEvent("
+        "  new Event('submit', {bubbles: true, cancelable: true}));"
+        "return 'ok';" % (json.dumps(code), json.dumps(date))
+    )
+
+
+def popup_tests(s):
+    port = 18345
+    d, url = build_popup_test_page(port)
+    httpd = None
+
+    class QuietHandler(SimpleHTTPRequestHandler):
+        def log_message(self, fmt, *args):
+            pass
+
+    class Server(ThreadingMixIn, HTTPServer):
+        daemon_threads = True
+        allow_reuse_address = True
+
+    try:
+        httpd = Server(("127.0.0.1", port), lambda *a, **kw: QuietHandler(*a, directory=d, **kw))
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        s.client.navigate(url)
+        time.sleep(1)
+
+        st = pstate(s)
+        check("popup: empty state (0 total, 0 valid, empty message)",
+              st["total"] == "0" and st["valid"] == "0"
+              and "No vouchers yet" in st["empty"], st["empty"])
+
+        popup_add(s, "E2E-FUTURE-999", "2028-06-30")
+        popup_add(s, "E2E-SOON-111", "2026-10-05")
+        popup_add(s, "E2E-EXPIRED-1", "2020-01-01")
+        time.sleep(1)
+
+        st = pstate(s)
+        codes = [i["text"].split("Expires")[0].strip() for i in st["items"]]
+        check("popup: 3 vouchers sorted oldest-first",
+              codes == ["E2E-EXPIRED-1", "E2E-SOON-111", "E2E-FUTURE-999"], codes)
+        check("popup: totals 3 total / 2 valid",
+              st["total"] == "3" and st["valid"] == "2", (st["total"], st["valid"]))
+        cls = [i["cls"] for i in st["items"]]
+        check("popup: expired vs valid color-coding",
+              "expired" in cls[0] and "valid" in cls[1] and "expired" not in cls[1], cls)
+        check("popup: expiry date rendered DD/MM/YYYY",
+              "Expires: 05/10/2026" in st["items"][1]["text"], st["items"][1]["text"])
+        check("popup: no dialogs during normal adds",
+              st["alerts"] == [] and st["confirms"] == [], (st["alerts"], st["confirms"]))
+
+        popup_add(s, "E2E-SOON-111", "2027-01-01")  # duplicate code
+        time.sleep(0.8)
+        st = pstate(s)
+        check("popup: duplicate code rejected with alert, nothing added",
+              len(st["items"]) == 3 and "already exists" in " ".join(st["alerts"]), st["alerts"])
+
+        s.page_js("document.querySelector('.voucher-item .delete-btn').click(); return 'ok';")
+        gone = False
+        for _ in range(20):
+            st = pstate(s)
+            if len(st["items"]) == 2:
+                gone = True
+                break
+            time.sleep(0.4)
+        store_codes = [v["code"] for v in st["store"]]
+        check("popup: delete removes voucher after confirm, list re-renders",
+              gone and store_codes == ["E2E-SOON-111", "E2E-FUTURE-999"]
+              and st["confirms"] != [], (store_codes, st["confirms"]))
+    finally:
+        if httpd:
+            httpd.shutdown()
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def phase_a():
+    s = Session(seed_vouchers=[])
+    try:
+        check("extension installs as temporary add-on (MV3 manifest accepted)",
+              s.addon_id == ADDON_ID, s.addon_id)
+        check("extension internal URL resolvable", bool(s.base), s.base)
+
+        s.client.navigate(SITE)
+        ready = wait_page_ready(s, 60)
+        time.sleep(4)
+        check("content script: no banner on sncf-connect.com with no vouchers",
+              ready and banner_text(s) is None,
+              "ready=%s title=%s" % (ready, s.client.title))
+
+        popup_tests(s)
+    finally:
+        s.close()
+
+
+def phase_b():
+    vouchers = [
+        {"id": "1", "code": "E2E-EXPIRED-1", "expiryDate": "2020-01-01",
+         "createdAt": "2026-09-29T00:00:00.000Z"},
+        {"id": "2", "code": "E2E-SOON-111", "expiryDate": "2026-10-05",
+         "createdAt": "2026-09-29T00:00:00.000Z"},
+        {"id": "3", "code": "E2E-FUTURE-999", "expiryDate": "2028-06-30",
+         "createdAt": "2026-09-29T00:00:00.000Z"},
+    ]
+    s = Session(seed_vouchers=vouchers)
+    try:
+        check("extension installs (phase B)", s.addon_id == ADDON_ID, s.addon_id)
+
+        s.client.navigate(SITE)
+        ready = wait_page_ready(s, 60)
+        banner = None
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            banner = banner_text(s)
+            if banner and not str(banner).startswith("ERR:"):
+                break
+            time.sleep(1)
+        check("content script: banner appears on sncf-connect.com with valid vouchers",
+              ready and banner is not None, banner)
+        check("banner shows oldest VALID voucher (expired one filtered out)",
+              bool(banner) and "E2E-SOON-111" in banner and "E2E-EXPIRED-1" not in banner, banner)
+        check("banner shows voucher count and DD/MM/YYYY expiry",
+              bool(banner) and "2 valid SNCF vouchers" in banner
+              and "expires 05/10/2026" in banner, banner)
+
+        s.page_js(
+            "var b = document.getElementById('sncf-voucher-reminder');"
+            "if (b) b.querySelector('.banner-close').click(); return 'ok';"
+        )
+        gone = False
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            if s.page_js("return document.getElementById('sncf-voucher-reminder') === null;") is True:
+                gone = True
+                break
+            time.sleep(0.3)
+        check("banner close button removes banner", gone)
+    finally:
+        s.close()
+
+
+def main():
+    phase = sys.argv[1] if len(sys.argv) > 1 else "a"
+    if phase == "a":
+        phase_a()
+    elif phase == "b":
+        phase_b()
+    else:
+        print("usage: wagonbar_e2e.py [a|b]")
+        return 2
+    failed = [n for n, ok in RESULTS if not ok]
+    print("\n%d checks, %d failed" % (len(RESULTS), len(failed)), flush=True)
+    for n in failed:
+        print("FAILED: " + n, flush=True)
+    return 1 if failed else 0
+
+
+sys.exit(main())
