@@ -433,14 +433,23 @@ def popup_tests(s):
               and any(v["code"] == "GPLI089N3" for v in st["store"]),
               (st["status"], st["store"]))
 
-        # odd-length code: saved anyway, but a warning is displayed
-        popup_add(s, "SHORT", "2027-03-03")
+        # odd-length code: warning appears when focus leaves the code field,
+        # and the save is never blocked
+        s.page_js("var c = document.getElementById('voucherCode');"
+                   "c.value = 'TOOLONGCODE'; c.dispatchEvent(new Event('blur'));"
+                   "return 'ok';")
+        time.sleep(0.2)
+        st = pstate(s)
+        check("popup: odd-length code warns when focus leaves the field",
+              not st["status"]["hidden"] and "usual" in st["status"]["text"],
+              st["status"])
+
+        popup_add(s, "TOOLONGCODE", "2027-03-03")
         time.sleep(0.6)
         st = pstate(s)
-        check("popup: odd-length code saved with warning, not blocked",
-              any(v["code"] == "SHORT" for v in st["store"])
-              and not st["status"]["hidden"]
-              and "usual" in st["status"]["text"],
+        check("popup: odd-length code saved anyway, warning cleared",
+              any(v["code"] == "TOOLONGCODE" for v in st["store"])
+              and st["status"]["hidden"],
               (st["status"], st["store"]))
     finally:
         if httpd:

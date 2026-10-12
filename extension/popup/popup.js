@@ -128,19 +128,26 @@ document.addEventListener('DOMContentLoaded', function() {
       vouchers.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
 
       browser.storage.local.set({ vouchers: vouchers }).then(function() {
-        if (code.length !== EXPECTED_CODE_LENGTH) {
-          showStatus('Voucher saved, but "' + code + '" is not the usual ' +
-                      EXPECTED_CODE_LENGTH + '-character voucher code. ' +
-                      'Double-check it in the list below.', 'warning');
-        } else {
-          clearStatus();
-        }
+        clearStatus();
         addVoucherForm.reset();
         closeCalendar();
         updateGhost();
         loadVouchers();
       });
     });
+  });
+
+  // Warn (without blocking) when the code doesn't look like a usual
+  // voucher code, as soon as the user leaves the code field
+  document.getElementById('voucherCode').addEventListener('blur', function() {
+    const code = this.value.trim().toUpperCase();
+    if (code && code.length !== EXPECTED_CODE_LENGTH) {
+      showStatus('"' + code + '" does not look like a usual ' +
+                  EXPECTED_CODE_LENGTH + '-character voucher code. ' +
+                  'Double-check it.', 'warning');
+    } else {
+      clearStatus();
+    }
   });
 
   // Load vouchers from storage
