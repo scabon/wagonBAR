@@ -39,12 +39,18 @@
         </div>
       </form>
       <div class="status-slot">
-        <div id="statusMessage" class="status-message" hidden></div>
+        <div id="statusMessage" class="status-message" title="Click to dismiss" hidden></div>
       </div>
     </div>
 
     <div class="section">
-      <h2>Your Vouchers</h2>
+      <div class="list-header">
+        <h2>Your Vouchers</h2>
+        <select id="sortOrder" title="Sort order">
+          <option value="date">By date</option>
+          <option value="code">By code</option>
+        </select>
+      </div>
       <div id="voucherList" class="voucher-list">
         <p class="empty-message">No vouchers yet. Add one above!</p>
       </div>

@@ -333,6 +333,29 @@ input[type="date"]:focus {
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 13px;
+  cursor: pointer;
+}
+
+/* Sort control next to the voucher list title */
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.list-header h2 {
+  margin: 16px 0 8px 0;
+}
+
+.list-header select {
+  padding: 4px 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  font-size: 12px;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  cursor: pointer;
 }
 
 .status-message.error {

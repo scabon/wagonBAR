@@ -8,9 +8,12 @@ document.addEventListener('DOMContentLoaded', function() {
   const statusMessage = document.getElementById('statusMessage');
   const submitBtn = document.getElementById('submitBtn');
   const cancelEditBtn = document.getElementById('cancelEditBtn');
+  const sortSelect = document.getElementById('sortOrder');
 
   // Voucher currently being edited in the form, null when adding
   let editingId = null;
+  // Auto-dismiss timer for transient status messages
+  let statusTimer = null;
   const expiryInput = document.getElementById('expiryDate');
   const calendarBtn = document.getElementById('calendarToggle');
   const calendarPanel = document.getElementById('calendarPanel');
@@ -33,18 +36,27 @@ document.addEventListener('DOMContentLoaded', function() {
   loadVouchers();
   updateGhost();
 
-  // Show an inline status message (no native dialogs)
+  // Show an inline status message (no native dialogs). Warnings and
+  // successes are transient: they auto-dismiss and can be clicked away.
+  // Errors stay until the next action.
   function showStatus(text, type) {
+    clearTimeout(statusTimer);
     statusMessage.textContent = text;
     statusMessage.className = 'status-message' + (type ? ' ' + type : '');
     statusMessage.hidden = false;
+    if (type === 'success' || type === 'warning') {
+      statusTimer = setTimeout(clearStatus, 4000);
+    }
   }
 
   function clearStatus() {
+    clearTimeout(statusTimer);
     statusMessage.hidden = true;
     statusMessage.textContent = '';
     statusMessage.className = 'status-message';
   }
+
+  statusMessage.addEventListener('click', clearStatus);
 
   // Parse ISO (YYYY-MM-DD) text into an ISO date string,
   // or null when it is not a real calendar date
@@ -212,13 +224,17 @@ document.addEventListener('DOMContentLoaded', function() {
     startEdit(btn.dataset.id);
   });
 
-  // Load vouchers from storage
+  // Load vouchers from storage, applying the remembered sort order
   function loadVouchers() {
-    browser.storage.local.get('vouchers').then(function(data) {
-      const vouchers = data.vouchers || [];
-      renderVouchers(vouchers);
+    browser.storage.local.get(['vouchers', 'sortOrder']).then(function(data) {
+      sortSelect.value = data.sortOrder === 'code' ? 'code' : 'date';
+      renderVouchers(data.vouchers || []);
     });
   }
+
+  sortSelect.addEventListener('change', function() {
+    browser.storage.local.set({ sortOrder: sortSelect.value }).then(loadVouchers);
+  });
 
   // Create an element with optional class and text
   function buildNode(tag, className, text) {
@@ -333,9 +349,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Render vouchers in the list
+  // Render vouchers in the list, sorted by date or by code
   function renderVouchers(vouchers) {
-    if (vouchers.length === 0) {
+    const sorted = vouchers.slice();
+    if (sortSelect.value === 'code') {
+      sorted.sort((a, b) => a.code.localeCompare(b.code));
+    } else {
+      sorted.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+    }
+
+    if (sorted.length === 0) {
       voucherList.replaceChildren(buildNode('p', 'empty-message', 'No vouchers yet. Add one above!'));
       totalVouchersSpan.textContent = '0';
       validVouchersSpan.textContent = '0';
@@ -348,7 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let validCount = 0;
     const frag = document.createDocumentFragment();
 
-    vouchers.forEach(function(voucher) {
+    sorted.forEach(function(voucher) {
       const expiryDate = new Date(voucher.expiryDate);
       const isValid = expiryDate >= now;
 

@@ -293,6 +293,13 @@ def popup_tests(s):
               and "fill in both fields" in st["status"]["text"]
               and st["alerts"] == [] and st["confirms"] == [], st["status"])
 
+        # errors are not transient: they must stay until the next action
+        time.sleep(4.5)
+        st = pstate(s)
+        check("popup: errors stay until the next action (no auto-dismiss)",
+              not st["status"]["hidden"]
+              and "fill in both fields" in st["status"]["text"], st["status"])
+
         soon = date.today() + timedelta(days=7)
         soon_d = soon.strftime("%Y-%m-%d")
         popup_add(s, "E2E-FUTURE-999", "2028-06-30")
@@ -471,6 +478,26 @@ def popup_tests(s):
               and size_trunc == size_base,
               (st["status"], size_base, size_trunc))
 
+        # transient messages can be clicked away and auto-expire
+        s.page_js("document.getElementById('statusMessage').click(); return 'ok';")
+        time.sleep(0.2)
+        st = pstate(s)
+        check("popup: status dismissible by click",
+              st["status"]["hidden"], st["status"])
+
+        s.page_js("var c = document.getElementById('voucherCode');"
+                   "c.value = 'TOOLONGCODE'; c.dispatchEvent(new Event('blur'));"
+                   "return 'ok';")
+        time.sleep(0.2)
+        st = pstate(s)
+        check("popup: warning shows again after being dismissed",
+              not st["status"]["hidden"]
+              and "TOOLONGCODE" in st["status"]["text"], st["status"])
+        time.sleep(4.5)
+        st = pstate(s)
+        check("popup: warning auto-dismisses after a few seconds",
+              st["status"]["hidden"], st["status"])
+
         popup_add(s, "TOOLONGCODE", "2027-03-03")
         time.sleep(0.6)
         st = pstate(s)
@@ -531,6 +558,34 @@ def popup_tests(s):
               and any(v["code"] == "GPLI089N3" and v["expiryDate"] == "2027-04-01"
                       for v in st["store"]),
               (fst, st["store"]))
+
+        # sorting: by expiration date by default, switchable to by code,
+        # and the choice is kept across renders
+        def list_codes():
+            st = pstate(s)
+            return [i["text"].split("Expires")[0].strip() for i in st["items"]]
+
+        check("popup: vouchers sorted by expiration date by default",
+              list_codes() == ["E2E-PICKED-1", "E2E-SOON-111", "E2E-TRIM-1",
+                               "TOOLONGCODE", "GPLI089N3", "E2E-FUTURE-999"],
+              list_codes())
+
+        s.page_js("var s = document.getElementById('sortOrder');"
+                   "s.value = 'code'; s.dispatchEvent(new Event('change'));"
+                   "return 'ok';")
+        time.sleep(0.4)
+        check("popup: sorting by code reorders the list",
+              list_codes() == ["E2E-FUTURE-999", "E2E-PICKED-1", "E2E-SOON-111",
+                               "E2E-TRIM-1", "GPLI089N3", "TOOLONGCODE"],
+              list_codes())
+
+        popup_add(s, "E2E-AAFIRST-1", "2029-01-01")
+        time.sleep(0.6)
+        check("popup: code sort kept after adding a voucher",
+              list_codes() == ["E2E-AAFIRST-1", "E2E-FUTURE-999", "E2E-PICKED-1",
+                               "E2E-SOON-111", "E2E-TRIM-1", "GPLI089N3",
+                               "TOOLONGCODE"],
+              list_codes())
     finally:
         if httpd:
             httpd.shutdown()

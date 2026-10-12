@@ -42,6 +42,10 @@ What is covered:
 - editing: "Edit" loads a voucher into the form (submit relabeled,
   Cancel appears), saving updates it in place (unchanged code not treated
   as a duplicate) with a success message, Cancel exits without changes
+- sorting: by expiration date by default, switchable to by code, kept
+  across renders
+- status messages: warnings dismissible by click and auto-expiring;
+  errors stay until the next action
 - toolbar badge on the extension icon: empty with no vouchers, and the count
   of valid vouchers with seeded storage (expired filtered out) — read from
   the toolbar button in chrome context; the button is pinned to the nav-bar
