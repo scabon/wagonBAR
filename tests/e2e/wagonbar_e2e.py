@@ -221,6 +221,11 @@ def build_popup_test_page(port):
     for f in ("popup.css", "popup.js"):
         shutil.copy(os.path.join(POPUP_DIR, f), os.path.join(d, f))
     html = open(os.path.join(POPUP_DIR, "popup.html"), encoding="utf-8").read()
+    # The real popup is exactly as wide as the container (350px); constrain
+    # the test page the same way so wrapping matches the popup
+    html = html.replace('<link rel="stylesheet" href="popup.css">',
+                        '<link rel="stylesheet" href="popup.css">'
+                        '<style>body{max-width:350px}</style>')
     shim_tag = "<script>%s</script>" % SHIM
     html = html.replace("<script src=\"popup.js\"></script>",
                         shim_tag + "\n  <script src=\"popup.js\"></script>")
@@ -436,7 +441,9 @@ def popup_tests(s):
         # odd-length code: warning appears when focus leaves the code field,
         # and the save is never blocked; showing/clearing a message must
         # never change the popup size
-        h_base = s.page_js("return document.body.offsetHeight;")
+        size = lambda: s.page_js(
+            "return [document.body.offsetWidth, document.body.offsetHeight];")
+        size_base = size()
         s.page_js("var c = document.getElementById('voucherCode');"
                    "c.value = 'TOOLONGCODE'; c.dispatchEvent(new Event('blur'));"
                    "return 'ok';")
@@ -445,9 +452,24 @@ def popup_tests(s):
         check("popup: odd-length code warns when focus leaves the field",
               not st["status"]["hidden"] and "usual" in st["status"]["text"],
               st["status"])
-        h_warn = s.page_js("return document.body.offsetHeight;")
+        size_warn = size()
         check("popup: popup size unchanged while the warning shows",
-              h_warn == h_base, (h_base, h_warn))
+              size_warn == size_base, (size_base, size_warn))
+
+        # a very long code is truncated in the warning so the message
+        # can never overflow the reserved space
+        s.page_js("var c = document.getElementById('voucherCode');"
+                   "c.value = 'E2E-VERY-LONG-CODE-12345';"
+                   "c.dispatchEvent(new Event('blur')); return 'ok';")
+        time.sleep(0.2)
+        st = pstate(s)
+        size_trunc = size()
+        check("popup: long code truncated in the warning, size still stable",
+              not st["status"]["hidden"]
+              and "\u2026" in st["status"]["text"]
+              and "E2E-VERY-LONG-CODE-12345" not in st["status"]["text"]
+              and size_trunc == size_base,
+              (st["status"], size_base, size_trunc))
 
         popup_add(s, "TOOLONGCODE", "2027-03-03")
         time.sleep(0.6)
@@ -482,7 +504,7 @@ def popup_tests(s):
         time.sleep(0.6)
         st = pstate(s)
         fst = form_state()
-        h_saved = s.page_js("return document.body.offsetHeight;")
+        size_saved = size()
         check("popup: edited voucher updated in place, success shown",
               any(v["code"] == "GPLI089N3" and v["expiryDate"] == "2027-04-01"
                   for v in st["store"])
@@ -493,7 +515,7 @@ def popup_tests(s):
               and fst["cancelHidden"] is True,
               (st["status"], fst, st["store"]))
         check("popup: popup size unchanged after the success message",
-              h_saved == h_base, (h_base, h_saved))
+              size_saved == size_base, (size_base, size_saved))
 
         # cancel leaves edit mode without touching anything
         s.page_js("document.querySelectorAll('.voucher-item .edit-btn')[%d].click();"

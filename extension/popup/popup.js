@@ -171,7 +171,8 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('voucherCode').addEventListener('blur', function() {
     const code = this.value.trim().toUpperCase();
     if (code && code.length !== EXPECTED_CODE_LENGTH) {
-      showStatus('"' + code + '" does not look like a usual ' +
+      const shown = code.length > 12 ? code.slice(0, 12) + '\u2026' : code;
+      showStatus('"' + shown + '" does not look like a usual ' +
                   EXPECTED_CODE_LENGTH + '-character voucher code. ' +
                   'Double-check it.', 'warning');
     } else {
