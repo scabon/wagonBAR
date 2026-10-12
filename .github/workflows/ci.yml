@@ -46,8 +46,8 @@ jobs:
           Write-Output "Firefox: $ff"
           "FIREFOX_BIN=$ff" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Phase A - install, no-voucher banner, popup logic
+      - name: Phase A - install, empty badge, popup logic
         run: python -X utf8 tests/e2e/wagonbar_e2e.py a
 
-      - name: Phase B - seeded storage, banner, manage tab
+      - name: Phase B - seeded storage, badge count
         run: python -X utf8 tests/e2e/wagonbar_e2e.py b

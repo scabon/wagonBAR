@@ -16,8 +16,8 @@ Prerequisites:
 Run both phases (each launches and tears down its own Firefox instance):
 
 ```bash
-python tests/e2e/wagonbar_e2e.py a   # install + no-voucher banner + popup logic
-python tests/e2e/wagonbar_e2e.py b   # seeded storage + banner + close button
+python tests/e2e/wagonbar_e2e.py a   # install + empty badge + popup logic
+python tests/e2e/wagonbar_e2e.py b   # seeded storage + badge count
 ```
 
 The phases are separate because the storage backend caches its data file after
@@ -31,11 +31,15 @@ What is covered:
   two-step delete, counts, expired/valid classes, date rendering) — in a
   localhost-served copy of popup.html with a mocked `browser.storage`
   (Firefox blocks automation of real extension pages); asserts that no
-  native `alert`/`confirm` dialogs are used
-- content script on the real https://www.sncf-connect.com/: no banner with no
-  vouchers, banner showing the oldest valid voucher (expired filtered out)
-  with correct count and date, close button, and "Manage Vouchers" opening
-  the manage page in a new tab
+  native `alert`/`confirm` dialogs are used. Also covers the custom date
+  entry: typed DD/MM/YYYY dates, impossible dates (Feb 31) rejected
+  inline, and the calendar widget (opens on the icon, picking a day fills
+  the field and closes)
+- toolbar badge on the extension icon: empty with no vouchers, and the count
+  of valid vouchers with seeded storage (expired filtered out) — read from
+  the toolbar button in chrome context; the button is pinned to the nav-bar
+  via a seeded `browser.uiCustomization.state` because a fresh profile parks
+  extension buttons in the lazily-built unified-extensions panel
 
-Not covered: the toolbar popup panel itself (not automatable), the booking-page
-"Copy Code" banner variant (no stable booking URL), clipboard writes.
+Not covered: the toolbar popup panel itself (not automatable), badge
+colors (not exposed as DOM attributes).

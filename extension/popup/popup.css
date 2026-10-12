@@ -101,6 +101,115 @@ input[type="date"]:focus {
   box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
 }
 
+/* Expiration date row: text input + calendar toggle button */
+.date-row {
+  display: flex;
+  gap: 6px;
+}
+
+.date-row input {
+  flex: 1;
+}
+
+.calendar-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.calendar-btn:hover {
+  border-color: #0066cc;
+  color: #0066cc;
+}
+
+/* Custom calendar widget (the native date picker cannot open
+   inside a Firefox extension popup) */
+.calendar-panel {
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--section-bg);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.calendar-title {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.calendar-nav {
+  border: none;
+  background: none;
+  color: var(--text-color);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.calendar-nav:hover {
+  background: var(--scrollbar-track);
+  color: #0066cc;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+.calendar-weekday {
+  font-size: 11px;
+  color: var(--label-color);
+  padding: 2px 0;
+}
+
+.calendar-day {
+  border: none;
+  background: none;
+  border-radius: 4px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.calendar-day:hover {
+  background: #0066cc;
+  color: white;
+}
+
+.calendar-day.today {
+  font-weight: 600;
+  color: #0066cc;
+}
+
+.calendar-day.today:hover {
+  color: white;
+}
+
+.calendar-day.selected {
+  background: #0066cc;
+  color: white;
+  font-weight: 600;
+}
+
 .btn {
   padding: 8px 16px;
   border: none;

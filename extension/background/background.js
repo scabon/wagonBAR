@@ -1,22 +1,5 @@
 // Background script for SNCF Voucher Reminder
-// Handles storage and provides helper functions
-
-// Get the oldest valid voucher
-function getOldestValidVoucher() {
-  return browser.storage.local.get('vouchers').then(function(data) {
-    const vouchers = data.vouchers || [];
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    // Filter valid vouchers and sort by expiry date (oldest first)
-    const validVouchers = vouchers.filter(v => {
-      const expiryDate = new Date(v.expiryDate);
-      return expiryDate >= now;
-    }).sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
-
-    return validVouchers.length > 0 ? validVouchers[0] : null;
-  });
-}
+// Handles storage and keeps the toolbar badge in sync with valid vouchers
 
 // Get all valid vouchers
 function getValidVouchers() {
@@ -32,60 +15,26 @@ function getValidVouchers() {
   });
 }
 
-// Check if current tab is SNCF Connect
-function isSNCFConnectTab(tab) {
-  if (!tab || !tab.url) return false;
-
-  try {
-    const url = new URL(tab.url);
-    return url.hostname === 'sncf-connect.com' ||
-           url.hostname === 'www.sncf-connect.com';
-  } catch (e) {
-    return false;
-  }
+// Update the toolbar icon badge with the number of valid vouchers
+function updateBadge() {
+  return getValidVouchers().then(function(vouchers) {
+    const text = vouchers.length > 0 ? String(vouchers.length) : '';
+    return browser.action.setBadgeText({ text: text }).then(function() {
+      return browser.action.setBadgeBackgroundColor({ color: '#0066cc' });
+    }).then(function() {
+      return browser.action.setBadgeTextColor({ color: '#ffffff' });
+    });
+  }).catch(function(e) {
+    console.log('Could not update badge:', e);
+  });
 }
 
-// Listen for messages from content script
-browser.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  if (request.action === 'getOldestValidVoucher') {
-    getOldestValidVoucher().then(function(voucher) {
-      sendResponse({ voucher: voucher });
-    });
-    return true; // Required for async response
-  }
-
-  if (request.action === 'getValidVouchers') {
-    getValidVouchers().then(function(vouchers) {
-      sendResponse({ vouchers: vouchers });
-    });
-    return true;
-  }
-
-  if (request.action === 'openPopup') {
-    // Open the manage page in a new tab (action.openPopup is
-    // restricted to user-gesture contexts and often unavailable)
-    browser.tabs.create({ url: browser.runtime.getURL('popup/popup.html') })
-      .catch(function(e) {
-        console.log('Could not open manage page:', e);
-      });
+// Update the badge whenever the voucher list changes
+browser.storage.onChanged.addListener(function(changes, area) {
+  if (area === 'local' && changes.vouchers) {
+    updateBadge();
   }
 });
 
-// Check on tab update if it's SNCF Connect
-// This triggers a reminder banner for already-loaded tabs
-browser.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
-  if (changeInfo.status === 'complete' && isSNCFConnectTab(tab)) {
-    // Check if we should show a reminder
-    getValidVouchers().then(function(vouchers) {
-      if (vouchers && vouchers.length > 0) {
-        // Send message to content script to show reminder
-        browser.tabs.sendMessage(tabId, {
-          action: 'showReminder',
-          vouchers: vouchers
-        }).catch(() => {
-          // Content script might not be injected yet, that's ok
-        });
-      }
-    });
-  }
-});
+// Set the badge once the event page starts (install and browser startup)
+updateBadge();

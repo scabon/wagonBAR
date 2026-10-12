@@ -2,12 +2,12 @@
 
 Drives a real headless Firefox via Marionette, installs the extension as a
 temporary add-on, and verifies the full stack: manifest load, popup logic
-(real popup.js against a mocked browser.storage), storage backend, content
-script and reminder banner on https://www.sncf-connect.com/.
+(real popup.js against a mocked browser.storage), storage backend, and the
+toolbar icon badge showing the number of valid vouchers.
 
 Usage:
-    python tests/e2e/wagonbar_e2e.py a    # install + no-vouchers banner + popup logic
-    python tests/e2e/wagonbar_e2e.py b    # seeded storage + banner + close button
+    python tests/e2e/wagonbar_e2e.py a    # install + empty badge + popup logic
+    python tests/e2e/wagonbar_e2e.py b    # seeded storage + badge count
 
 Requires:
     - Firefox 121+ (Manifest V3 background event page) reachable as
@@ -22,6 +22,11 @@ Notes:
     - The popup is tested in a localhost-served copy of popup.html with a
       shim for browser.storage because Firefox blocks automation of real
       extension pages (privileged browsing context).
+    - The badge is read through Marionette's chrome context from the
+      extension's toolbar button. A fresh profile parks extension buttons
+      in the unified-extensions panel (whose DOM is built lazily and not
+      reachable headlessly), so the profile is seeded with a saved
+      CustomizableUI state that pins the button to the nav-bar.
     - Phase B seeds browser.storage.local by writing the extension's
       storage.js JSON file directly (legacy backend forced via
       extensions.webextensions.ExtensionStorageIDB.enabled=false, set before
@@ -37,6 +42,7 @@ import tempfile
 import threading
 import time
 import zipfile
+from datetime import date, timedelta
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -46,7 +52,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 EXT_DIR = os.path.join(REPO, "extension")
 POPUP_DIR = os.path.join(EXT_DIR, "popup")
 ADDON_ID = "wagonbar@scabon.com"
-SITE = "https://www.sncf-connect.com/"
+WIDGET_ID = "wagonbar_scabon_com-browser-action"  # makeWidgetId(ADDON_ID)
+BADGE_BTN_ID = "wagonbar_scabon_com-BAP"          # toolbar button inside the widget
 IDB_PREF = "extensions.webextensions.ExtensionStorageIDB.enabled"
 FIREFOX_BIN = os.environ.get("FIREFOX_BIN", "firefox.exe")
 RESULTS = []
@@ -86,6 +93,18 @@ class Session:
     def __init__(self, seed_vouchers=None):
         self.profile = tempfile.mkdtemp(prefix="wagonbar-ff-e2e-")
         self.xpi = build_xpi()
+        # Pin the extension's toolbar button to the nav-bar so the badge is
+        # readable from chrome context (fresh profiles park extension
+        # buttons in the lazily-built unified-extensions panel).
+        placement = {"placements": {"nav-bar": [WIDGET_ID]}}
+        with open(os.path.join(self.profile, "prefs.js"), "w", encoding="utf-8") as fh:
+            fh.write('user_pref("browser.uiCustomization.state", %s);\n'
+                     % json.dumps(json.dumps(placement)))
+        if seed_vouchers is not None:
+            d = os.path.join(self.profile, "browser-extension-data", ADDON_ID)
+            os.makedirs(d, exist_ok=True)
+            with open(os.path.join(d, "storage.js"), "w", encoding="utf-8") as fh:
+                fh.write(json.dumps({"vouchers": seed_vouchers}))
         self.proc = subprocess.Popen(
             [FIREFOX_BIN, "-marionette", "-headless", "-no-remote",
              "-profile", self.profile, "-remote-allow-system-access"],
@@ -107,11 +126,6 @@ class Session:
             raise RuntimeError("marionette session failed: %s" % last)
         # force the legacy JSONFile storage backend so storage.js seeding works
         self.client.set_pref(IDB_PREF, False)
-        if seed_vouchers is not None:
-            d = os.path.join(self.profile, "browser-extension-data", ADDON_ID)
-            os.makedirs(d, exist_ok=True)
-            with open(os.path.join(d, "storage.js"), "w", encoding="utf-8") as fh:
-                fh.write(json.dumps({"vouchers": seed_vouchers}))
         self.addon_id = Addons(self.client).install(self.xpi, temp=True)
         self.base = None
         for _ in range(20):
@@ -147,26 +161,36 @@ class Session:
             pass
 
 
-def wait_page_ready(s, timeout=60):
+def badge_text(s):
+    """Read the badge text from the extension's toolbar button (chrome context).
+
+    Returns '' when the button exists but has no badge, None when the
+    button is not in the toolbar DOM at all.
+    """
+    s.client.set_context(s.client.CONTEXT_CHROME)
+    try:
+        return s.client.execute_script(
+            "let win = Services.wm.getMostRecentWindow('navigator:browser');"
+            "let btn = win.document.getElementById(%s);"
+            "return btn ? (btn.getAttribute('badge') || '') : null;"
+            % json.dumps(BADGE_BTN_ID)
+        )
+    finally:
+        s.client.set_context(s.client.CONTEXT_CONTENT)
+
+
+def wait_for_badge(s, expected, timeout=30):
     deadline = time.time() + timeout
+    value = None
     while time.time() < deadline:
         try:
-            if s.page_js("return document.readyState === 'complete';") is True:
-                return True
-        except Exception:
-            pass
+            value = badge_text(s)
+        except Exception as e:
+            value = "ERR:" + str(e)
+        if value == expected:
+            return True
         time.sleep(0.5)
     return False
-
-
-def banner_text(s):
-    try:
-        return s.page_js(
-            "var b = document.getElementById('sncf-voucher-reminder');"
-            "return b ? b.innerText.replace(/\\s+/g, ' ') : null;"
-        )
-    except Exception as e:
-        return "ERR:" + str(e)
 
 
 SHIM = """
@@ -264,9 +288,11 @@ def popup_tests(s):
               and "fill in both fields" in st["status"]["text"]
               and st["alerts"] == [] and st["confirms"] == [], st["status"])
 
-        popup_add(s, "E2E-FUTURE-999", "2028-06-30")
-        popup_add(s, "E2E-SOON-111", "2026-10-05")
-        popup_add(s, "E2E-EXPIRED-1", "2020-01-01")
+        soon = date.today() + timedelta(days=7)
+        soon_d = soon.strftime("%d/%m/%Y")
+        popup_add(s, "E2E-FUTURE-999", "30/06/2028")
+        popup_add(s, "E2E-SOON-111", soon_d)
+        popup_add(s, "E2E-EXPIRED-1", "01/01/2020")
         time.sleep(1)
 
         st = pstate(s)
@@ -279,11 +305,11 @@ def popup_tests(s):
         check("popup: expired vs valid color-coding",
               "expired" in cls[0] and "valid" in cls[1] and "expired" not in cls[1], cls)
         check("popup: expiry date rendered DD/MM/YYYY",
-              "Expires: 05/10/2026" in st["items"][1]["text"], st["items"][1]["text"])
+              ("Expires: " + soon_d) in st["items"][1]["text"], st["items"][1]["text"])
         check("popup: no dialogs during normal adds",
               st["alerts"] == [] and st["confirms"] == [], (st["alerts"], st["confirms"]))
 
-        popup_add(s, "E2E-SOON-111", "2027-01-01")  # duplicate code
+        popup_add(s, "E2E-SOON-111", "01/01/2027")  # duplicate code
         time.sleep(0.8)
         st = pstate(s)
         check("popup: duplicate code rejected inline, nothing added",
@@ -312,6 +338,56 @@ def popup_tests(s):
               gone and store_codes == ["E2E-SOON-111", "E2E-FUTURE-999"]
               and st["confirms"] == [] and st["alerts"] == [],
               (store_codes, st["confirms"], st["alerts"]))
+
+        # the date is a text field (the native picker cannot open in a popup):
+        # impossible dates are rejected inline, nothing added
+        popup_add(s, "E2E-BAD-1", "31/02/2028")  # February 31st
+        time.sleep(0.6)
+        st = pstate(s)
+        check("popup: impossible date rejected inline, nothing added",
+              len(st["items"]) == 2 and not st["status"]["hidden"]
+              and "valid expiration date" in st["status"]["text"]
+              and st["alerts"] == [], (st["status"], st["alerts"]))
+
+        # custom calendar widget: icon opens a month grid, picking a day
+        # fills the field and closes the grid
+        s.page_js("document.getElementById('calendarToggle').click(); return 'ok';")
+        time.sleep(0.4)
+        cal = json.loads(s.page_js(
+            "var p = document.getElementById('calendarPanel');"
+            "return JSON.stringify({hidden: p.hidden,"
+            " days: p.querySelectorAll('.calendar-day').length,"
+            " title: p.querySelector('.calendar-title').textContent});"
+        ))
+        now = time.localtime()
+        check("calendar: icon opens month grid for the current month",
+              cal["hidden"] is False and 28 <= cal["days"] <= 31
+              and str(now.tm_year) in cal["title"], cal)
+
+        s.page_js(
+            "document.getElementById('calendarPanel')"
+            ".querySelectorAll('.calendar-day')[14].click(); return 'ok';"
+        )
+        time.sleep(0.3)
+        cal = json.loads(s.page_js(
+            "var p = document.getElementById('calendarPanel');"
+            "return JSON.stringify({hidden: p.hidden,"
+            " value: document.getElementById('expiryDate').value});"
+        ))
+        picked = "15/%02d/%d" % (now.tm_mon, now.tm_year)
+        check("calendar: picking a day fills the field DD/MM/YYYY and closes",
+              cal["hidden"] is True and cal["value"] == picked, cal)
+
+        # the calendar-picked date goes through the form submit as ISO storage
+        popup_add(s, "E2E-PICKED-1", picked)
+        time.sleep(0.6)
+        st = pstate(s)
+        picked_iso = "%d-%02d-15" % (now.tm_year, now.tm_mon)
+        check("popup: calendar-picked date accepted on submit (ISO storage)",
+              len(st["items"]) == 3
+              and any(v["code"] == "E2E-PICKED-1"
+                      and v["expiryDate"] == picked_iso for v in st["store"]),
+              (st["store"], picked_iso))
     finally:
         if httpd:
             httpd.shutdown()
@@ -325,12 +401,8 @@ def phase_a():
               s.addon_id == ADDON_ID, s.addon_id)
         check("extension internal URL resolvable", bool(s.base), s.base)
 
-        s.client.navigate(SITE)
-        ready = wait_page_ready(s, 60)
-        time.sleep(4)
-        check("content script: no banner on sncf-connect.com with no vouchers",
-              ready and banner_text(s) is None,
-              "ready=%s title=%s" % (ready, s.client.title))
+        check("badge: empty (no badge) with no vouchers",
+              wait_for_badge(s, ""), badge_text(s))
 
         popup_tests(s)
     finally:
@@ -341,7 +413,8 @@ def phase_b():
     vouchers = [
         {"id": "1", "code": "E2E-EXPIRED-1", "expiryDate": "2020-01-01",
          "createdAt": "2026-09-29T00:00:00.000Z"},
-        {"id": "2", "code": "E2E-SOON-111", "expiryDate": "2026-10-05",
+        {"id": "2", "code": "E2E-SOON-111",
+         "expiryDate": (date.today() + timedelta(days=7)).isoformat(),
          "createdAt": "2026-09-29T00:00:00.000Z"},
         {"id": "3", "code": "E2E-FUTURE-999", "expiryDate": "2028-06-30",
          "createdAt": "2026-09-29T00:00:00.000Z"},
@@ -349,67 +422,8 @@ def phase_b():
     s = Session(seed_vouchers=vouchers)
     try:
         check("extension installs (phase B)", s.addon_id == ADDON_ID, s.addon_id)
-
-        s.client.navigate(SITE)
-        ready = wait_page_ready(s, 60)
-        banner = None
-        deadline = time.time() + 60
-        while time.time() < deadline:
-            banner = banner_text(s)
-            if banner and not str(banner).startswith("ERR:"):
-                break
-            time.sleep(1)
-        check("content script: banner appears on sncf-connect.com with valid vouchers",
-              ready and banner is not None, banner)
-        check("banner shows oldest VALID voucher (expired one filtered out)",
-              bool(banner) and "E2E-SOON-111" in banner and "E2E-EXPIRED-1" not in banner, banner)
-        check("banner shows voucher count and DD/MM/YYYY expiry",
-              bool(banner) and "2 valid SNCF vouchers" in banner
-              and "expires 05/10/2026" in banner, banner)
-
-        s.page_js(
-            "var b = document.getElementById('sncf-voucher-reminder');"
-            "if (b) b.querySelector('.banner-close').click(); return 'ok';"
-        )
-        gone = False
-        deadline = time.time() + 5
-        while time.time() < deadline:
-            if s.page_js("return document.getElementById('sncf-voucher-reminder') === null;") is True:
-                gone = True
-                break
-            time.sleep(0.3)
-        check("banner close button removes banner", gone)
-
-        # Manage Vouchers opens the manage page in a new tab
-        handles_before = set(s.client.window_handles)
-        s.client.navigate(SITE)
-        banner = None
-        deadline = time.time() + 60
-        while time.time() < deadline:
-            banner = banner_text(s)
-            if banner and not str(banner).startswith("ERR:"):
-                break
-            time.sleep(1)
-        s.page_js(
-            "var b = document.getElementById('sncf-voucher-reminder');"
-            "if (b) b.querySelector('.manage-btn').click(); return 'ok';"
-        )
-        new_handle = None
-        deadline = time.time() + 15
-        while time.time() < deadline:
-            new_handles = set(s.client.window_handles) - handles_before
-            if new_handles:
-                new_handle = sorted(new_handles)[0]
-                break
-            time.sleep(0.5)
-        check("Manage Vouchers opens a new tab", new_handle is not None,
-              sorted(set(s.client.window_handles) - handles_before))
-        if new_handle:
-            s.client.switch_to_window(new_handle)
-            manage_url = s.client.get_url()
-            check("new tab is the extension manage page",
-                  manage_url.startswith(s.base) and manage_url.endswith("popup/popup.html"),
-                  manage_url)
+        check("badge: shows count of valid vouchers (expired one filtered out)",
+              wait_for_badge(s, "2"), badge_text(s))
     finally:
         s.close()
 
