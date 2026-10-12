@@ -389,8 +389,9 @@ def popup_tests(s):
                       and v["expiryDate"] == picked_iso for v in st["store"]),
               (st["store"], picked_iso))
 
-        # date entry: digits are auto-dashed and the remaining format is
-        # kept visible as a grey hint behind the typed text
+        # date entry: digits are auto-dashed (the dash appears as soon as
+        # the year or month is complete) and the remaining format is kept
+        # visible as a grey hint behind the typed text
         s.page_js("var i = document.getElementById('expiryDate');"
                   "i.value = '2026'; i.dispatchEvent(new Event('input')); return 'ok';")
         time.sleep(0.2)
@@ -401,8 +402,8 @@ def popup_tests(s):
             " ghostRest: g.querySelector('.ghost-rest') ?"
             "   g.querySelector('.ghost-rest').textContent : null});"
         ))
-        check("popup: partial date keeps grey hint of remaining format",
-              st["value"] == "2026" and st["ghostRest"] == "-MM-DD", st)
+        check("popup: dash appended after the year, grey hint keeps format",
+              st["value"] == "2026-" and st["ghostRest"] == "MM-DD", st)
 
         s.page_js("var i = document.getElementById('expiryDate');"
                   "i.value = '20261015'; i.dispatchEvent(new Event('input')); return 'ok';")

@@ -65,8 +65,8 @@ document.addEventListener('DOMContentLoaded', function() {
   expiryInput.addEventListener('input', function() {
     const digits = expiryInput.value.replace(/\D/g, '').slice(0, 8);
     let formatted = digits.slice(0, 4);
-    if (digits.length > 4) formatted += '-' + digits.slice(4, 6);
-    if (digits.length > 6) formatted += '-' + digits.slice(6);
+    if (digits.length >= 4) formatted += '-' + digits.slice(4, 6);
+    if (digits.length >= 6) formatted += '-' + digits.slice(6);
     expiryInput.value = formatted;
     updateGhost();
   });
