@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', function() {
   const expiryInput = document.getElementById('expiryDate');
   const calendarBtn = document.getElementById('calendarToggle');
   const calendarPanel = document.getElementById('calendarPanel');
+  const expiryGhost = document.getElementById('expiryGhost');
+
+  // Usual SNCF voucher code length (may evolve, only used for a warning)
+  const EXPECTED_CODE_LENGTH = 9;
+  // Date entry pattern shown as the grey hint while typing
+  const DATE_PATTERN = 'YYYY-MM-DD';
 
   // Firefox cannot open its native date picker inside an extension popup,
   // so the date is a text field with this custom calendar widget
@@ -20,6 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Load and display vouchers
   loadVouchers();
+  updateGhost();
 
   // Show an inline status message (no native dialogs)
   function showStatus(text, type) {
@@ -51,6 +58,32 @@ document.addEventListener('DOMContentLoaded', function() {
       return null;
     }
     return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  // Auto-insert the dashes while typing and keep a grey hint showing the
+  // remaining part of the date pattern behind the typed text
+  expiryInput.addEventListener('input', function() {
+    const digits = expiryInput.value.replace(/\D/g, '').slice(0, 8);
+    let formatted = digits.slice(0, 4);
+    if (digits.length > 4) formatted += '-' + digits.slice(4, 6);
+    if (digits.length > 6) formatted += '-' + digits.slice(6);
+    expiryInput.value = formatted;
+    updateGhost();
+  });
+
+  function updateGhost() {
+    const value = expiryInput.value;
+    if (!value || value.length >= DATE_PATTERN.length) {
+      expiryGhost.textContent = '';
+      return;
+    }
+    const typed = document.createElement('span');
+    typed.className = 'ghost-typed';
+    typed.textContent = value;
+    const rest = document.createElement('span');
+    rest.className = 'ghost-rest';
+    rest.textContent = DATE_PATTERN.slice(value.length);
+    expiryGhost.replaceChildren(typed, rest);
   }
 
   // Form submission
@@ -95,9 +128,16 @@ document.addEventListener('DOMContentLoaded', function() {
       vouchers.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
 
       browser.storage.local.set({ vouchers: vouchers }).then(function() {
-        clearStatus();
+        if (code.length !== EXPECTED_CODE_LENGTH) {
+          showStatus('Voucher saved, but "' + code + '" is not the usual ' +
+                      EXPECTED_CODE_LENGTH + '-character voucher code. ' +
+                      'Double-check it in the list below.', 'warning');
+        } else {
+          clearStatus();
+        }
         addVoucherForm.reset();
         closeCalendar();
+        updateGhost();
         loadVouchers();
       });
     });
@@ -179,6 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!dayBtn) return;
       const picked = new Date(dayBtn.dataset.date + 'T00:00:00');
       expiryInput.value = formatDate(picked);
+      updateGhost();
       closeCalendar();
     });
   }

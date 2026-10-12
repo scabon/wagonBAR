@@ -20,7 +20,10 @@
         <div class="form-group">
           <label for="expiryDate">Expiration Date:</label>
           <div class="date-row">
-            <input type="text" id="expiryDate" placeholder="YYYY-MM-DD" inputmode="numeric" required>
+            <div class="date-input-wrap">
+              <span id="expiryGhost" class="input-ghost" aria-hidden="true"></span>
+              <input type="text" id="expiryDate" placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" required>
+            </div>
             <button type="button" id="calendarToggle" class="calendar-btn" aria-label="Pick a date from the calendar" title="Pick a date">
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                 <rect x="1.5" y="3" width="13" height="11.5" rx="1.5"></rect>

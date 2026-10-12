@@ -388,6 +388,59 @@ def popup_tests(s):
               and any(v["code"] == "E2E-PICKED-1"
                       and v["expiryDate"] == picked_iso for v in st["store"]),
               (st["store"], picked_iso))
+
+        # date entry: digits are auto-dashed and the remaining format is
+        # kept visible as a grey hint behind the typed text
+        s.page_js("var i = document.getElementById('expiryDate');"
+                  "i.value = '2026'; i.dispatchEvent(new Event('input')); return 'ok';")
+        time.sleep(0.2)
+        st = json.loads(s.page_js(
+            "var g = document.getElementById('expiryGhost');"
+            "return JSON.stringify({"
+            " value: document.getElementById('expiryDate').value,"
+            " ghostRest: g.querySelector('.ghost-rest') ?"
+            "   g.querySelector('.ghost-rest').textContent : null});"
+        ))
+        check("popup: partial date keeps grey hint of remaining format",
+              st["value"] == "2026" and st["ghostRest"] == "-MM-DD", st)
+
+        s.page_js("var i = document.getElementById('expiryDate');"
+                  "i.value = '20261015'; i.dispatchEvent(new Event('input')); return 'ok';")
+        time.sleep(0.2)
+        st = json.loads(s.page_js(
+            "return JSON.stringify({"
+            " value: document.getElementById('expiryDate').value,"
+            " ghostRest: (document.getElementById('expiryGhost')"
+            "   .querySelector('.ghost-rest') || {}).textContent || null});"
+        ))
+        check("popup: typed digits auto-dashed to YYYY-MM-DD, hint cleared",
+              st["value"] == "2026-10-15" and st["ghostRest"] is None, st)
+
+        # paste artifacts: leading/trailing spaces and line returns are trimmed
+        popup_add(s, "  E2E-TRIM-1 \n", "2027-03-01")
+        time.sleep(0.6)
+        st = pstate(s)
+        check("popup: pasted code trimmed of spaces/newlines",
+              any(v["code"] == "E2E-TRIM-1" for v in st["store"]), st["store"])
+
+        # usual 9-character code: saved without any warning
+        popup_add(s, "GPLI089N3", "2027-03-02")
+        time.sleep(0.6)
+        st = pstate(s)
+        check("popup: usual-length code saved without warning",
+              st["status"]["hidden"]
+              and any(v["code"] == "GPLI089N3" for v in st["store"]),
+              (st["status"], st["store"]))
+
+        # odd-length code: saved anyway, but a warning is displayed
+        popup_add(s, "SHORT", "2027-03-03")
+        time.sleep(0.6)
+        st = pstate(s)
+        check("popup: odd-length code saved with warning, not blocked",
+              any(v["code"] == "SHORT" for v in st["store"])
+              and not st["status"]["hidden"]
+              and "usual" in st["status"]["text"],
+              (st["status"], st["store"]))
     finally:
         if httpd:
             httpd.shutdown()

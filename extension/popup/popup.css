@@ -107,8 +107,13 @@ input[type="date"]:focus {
   gap: 6px;
 }
 
-.date-row input {
+.date-input-wrap {
+  position: relative;
   flex: 1;
+}
+
+.date-input-wrap input {
+  width: 100%;
 }
 
 .calendar-btn {
@@ -341,5 +346,50 @@ input[type="date"]:focus {
     background-color: #3a1a1a;
     color: #ff8f8f;
     border-color: #5c2a2a;
+  }
+}
+
+/* Grey format hint overlaid on the date input: typed text is rendered
+   invisibly to hold the caret position, the rest of the pattern in grey */
+.input-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.input-ghost .ghost-typed {
+  color: transparent;
+}
+
+/* Input and ghost must render with the same font for the hint to line up */
+.date-input-wrap input,
+.input-ghost {
+  font-family: inherit;
+}
+
+.input-ghost .ghost-rest {
+  color: var(--label-color);
+  opacity: 0.55;
+}
+
+.status-message.warning {
+  background-color: #fff8e1;
+  color: #8a6d3b;
+  border: 1px solid #ffe08a;
+}
+
+@media (prefers-color-scheme: dark) {
+  .status-message.warning {
+    background-color: #3a311a;
+    color: #ffd98f;
+    border-color: #5c4d1a;
   }
 }

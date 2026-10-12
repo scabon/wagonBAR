@@ -33,8 +33,11 @@ What is covered:
   (Firefox blocks automation of real extension pages); asserts that no
   native `alert`/`confirm` dialogs are used. Also covers the custom date
   entry: typed YYYY-MM-DD dates, impossible dates (Feb 31) rejected
-  inline, and the calendar widget (opens on the icon, picking a day fills
-  the field and closes)
+  inline, dashes auto-inserted while typing with the remaining format
+  shown as a grey hint, and the calendar widget (opens on the icon,
+  picking a day fills the field and closes)
+- voucher codes: pasted spaces/newlines trimmed, usual-length codes saved
+  without warning, odd-length codes saved with a non-blocking warning
 - toolbar badge on the extension icon: empty with no vouchers, and the count
   of valid vouchers with seeded storage (expired filtered out) — read from
   the toolbar button in chrome context; the button is pinned to the nav-bar
