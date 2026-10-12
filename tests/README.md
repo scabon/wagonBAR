@@ -32,7 +32,7 @@ What is covered:
   localhost-served copy of popup.html with a mocked `browser.storage`
   (Firefox blocks automation of real extension pages); asserts that no
   native `alert`/`confirm` dialogs are used. Also covers the custom date
-  entry: typed DD/MM/YYYY dates, impossible dates (Feb 31) rejected
+  entry: typed YYYY-MM-DD dates, impossible dates (Feb 31) rejected
   inline, and the calendar widget (opens on the icon, picking a day fills
   the field and closes)
 - toolbar badge on the extension icon: empty with no vouchers, and the count

@@ -34,14 +34,12 @@ document.addEventListener('DOMContentLoaded', function() {
     statusMessage.className = 'status-message';
   }
 
-  // Parse DD/MM/YYYY (or ISO YYYY-MM-DD) text into an ISO date string,
+  // Parse ISO (YYYY-MM-DD) text into an ISO date string,
   // or null when it is not a real calendar date
   function parseDateInput(str) {
-    let m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (m) return toISO(+m[3], +m[2], +m[1]);
-    m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-    if (m) return toISO(+m[1], +m[2], +m[3]);
-    return null;
+    const m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!m) return null;
+    return toISO(+m[1], +m[2], +m[3]);
   }
 
   // Build an ISO date string, or null when the day/month/year combination
@@ -69,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const expiryDate = parseDateInput(rawDate);
     if (!expiryDate) {
-      showStatus('Enter a valid expiration date (DD/MM/YYYY).', 'error');
+      showStatus('Enter a valid expiration date (YYYY-MM-DD).', 'error');
       return;
     }
 
@@ -301,11 +299,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // Format date as DD/MM/YYYY
+  // Format date as ISO YYYY-MM-DD
   function formatDate(date) {
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+    return `${year}-${month}-${day}`;
   }
 });

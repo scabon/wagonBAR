@@ -289,10 +289,10 @@ def popup_tests(s):
               and st["alerts"] == [] and st["confirms"] == [], st["status"])
 
         soon = date.today() + timedelta(days=7)
-        soon_d = soon.strftime("%d/%m/%Y")
-        popup_add(s, "E2E-FUTURE-999", "30/06/2028")
+        soon_d = soon.strftime("%Y-%m-%d")
+        popup_add(s, "E2E-FUTURE-999", "2028-06-30")
         popup_add(s, "E2E-SOON-111", soon_d)
-        popup_add(s, "E2E-EXPIRED-1", "01/01/2020")
+        popup_add(s, "E2E-EXPIRED-1", "2020-01-01")
         time.sleep(1)
 
         st = pstate(s)
@@ -304,12 +304,12 @@ def popup_tests(s):
         cls = [i["cls"] for i in st["items"]]
         check("popup: expired vs valid color-coding",
               "expired" in cls[0] and "valid" in cls[1] and "expired" not in cls[1], cls)
-        check("popup: expiry date rendered DD/MM/YYYY",
+        check("popup: expiry date rendered YYYY-MM-DD",
               ("Expires: " + soon_d) in st["items"][1]["text"], st["items"][1]["text"])
         check("popup: no dialogs during normal adds",
               st["alerts"] == [] and st["confirms"] == [], (st["alerts"], st["confirms"]))
 
-        popup_add(s, "E2E-SOON-111", "01/01/2027")  # duplicate code
+        popup_add(s, "E2E-SOON-111", "2027-01-01")  # duplicate code
         time.sleep(0.8)
         st = pstate(s)
         check("popup: duplicate code rejected inline, nothing added",
@@ -341,7 +341,7 @@ def popup_tests(s):
 
         # the date is a text field (the native picker cannot open in a popup):
         # impossible dates are rejected inline, nothing added
-        popup_add(s, "E2E-BAD-1", "31/02/2028")  # February 31st
+        popup_add(s, "E2E-BAD-1", "2028-02-31")  # February 31st
         time.sleep(0.6)
         st = pstate(s)
         check("popup: impossible date rejected inline, nothing added",
@@ -374,8 +374,8 @@ def popup_tests(s):
             "return JSON.stringify({hidden: p.hidden,"
             " value: document.getElementById('expiryDate').value});"
         ))
-        picked = "15/%02d/%d" % (now.tm_mon, now.tm_year)
-        check("calendar: picking a day fills the field DD/MM/YYYY and closes",
+        picked = "%d-%02d-15" % (now.tm_year, now.tm_mon)
+        check("calendar: picking a day fills the field YYYY-MM-DD and closes",
               cal["hidden"] is True and cal["value"] == picked, cal)
 
         # the calendar-picked date goes through the form submit as ISO storage
