@@ -386,10 +386,38 @@ input[type="date"]:focus {
   border: 1px solid #ffe08a;
 }
 
+.status-message.success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+}
+
+.form-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-secondary {
+  background-color: var(--section-bg);
+  color: var(--text-color);
+  border: 1px solid var(--input-border);
+}
+
+.btn-secondary:hover {
+  border-color: #0066cc;
+  color: #0066cc;
+}
+
 @media (prefers-color-scheme: dark) {
   .status-message.warning {
     background-color: #3a311a;
     color: #ffd98f;
     border-color: #5c4d1a;
+  }
+
+  .status-message.success {
+    background-color: #1a3320;
+    color: #8fd98f;
+    border-color: #2a5c2a;
   }
 }

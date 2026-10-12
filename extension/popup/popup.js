@@ -6,6 +6,11 @@ document.addEventListener('DOMContentLoaded', function() {
   const totalVouchersSpan = document.getElementById('totalVouchers');
   const validVouchersSpan = document.getElementById('validVouchers');
   const statusMessage = document.getElementById('statusMessage');
+  const submitBtn = document.getElementById('submitBtn');
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
+
+  // Voucher currently being edited in the form, null when adding
+  let editingId = null;
   const expiryInput = document.getElementById('expiryDate');
   const calendarBtn = document.getElementById('calendarToggle');
   const calendarPanel = document.getElementById('calendarPanel');
@@ -104,9 +109,33 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
-    // Add new voucher
     browser.storage.local.get('vouchers').then(function(data) {
       const vouchers = data.vouchers || [];
+
+      if (editingId) {
+        // Update the edited voucher (its own code doesn't count as duplicate)
+        const duplicate = vouchers.some(v => v.code === code && v.id !== editingId);
+        if (duplicate) {
+          showStatus('A voucher with this code already exists!', 'error');
+          return;
+        }
+        const edited = vouchers.find(v => v.id === editingId);
+        if (!edited) {
+          cancelEdit();
+          return;
+        }
+        edited.code = code;
+        edited.expiryDate = expiryDate;
+        vouchers.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+        browser.storage.local.set({ vouchers: vouchers }).then(function() {
+          cancelEdit();
+          loadVouchers();
+          showStatus('Voucher updated.', 'success');
+        });
+        return;
+      }
+
+      // Add new voucher
 
       // Check for duplicate
       const exists = vouchers.some(v => v.code === code);
@@ -148,6 +177,38 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       clearStatus();
     }
+  });
+
+  // Editing: load a voucher into the form, or leave edit mode
+  function startEdit(id) {
+    browser.storage.local.get('vouchers').then(function(data) {
+      const voucher = (data.vouchers || []).find(v => v.id === id);
+      if (!voucher) return;
+      editingId = id;
+      document.getElementById('voucherCode').value = voucher.code;
+      expiryInput.value = voucher.expiryDate;
+      updateGhost();
+      submitBtn.textContent = 'Update Voucher';
+      cancelEditBtn.hidden = false;
+      document.getElementById('voucherCode').focus();
+    });
+  }
+
+  function cancelEdit() {
+    editingId = null;
+    addVoucherForm.reset();
+    updateGhost();
+    submitBtn.textContent = 'Add Voucher';
+    cancelEditBtn.hidden = true;
+    clearStatus();
+  }
+
+  cancelEditBtn.addEventListener('click', cancelEdit);
+
+  voucherList.addEventListener('click', function(e) {
+    const btn = e.target.closest('.edit-btn');
+    if (!btn) return;
+    startEdit(btn.dataset.id);
   });
 
   // Load vouchers from storage
@@ -296,10 +357,14 @@ document.addEventListener('DOMContentLoaded', function() {
       info.appendChild(buildNode('div', 'code', voucher.code));
       info.appendChild(buildNode('div', 'expiry', 'Expires: ' + formatDate(expiryDate)));
 
+      const editBtn = buildNode('button', 'btn btn-secondary edit-btn', 'Edit');
+      editBtn.dataset.id = voucher.id;
+
       const deleteBtn = buildNode('button', 'btn btn-danger delete-btn', 'Delete');
       deleteBtn.dataset.id = voucher.id;
 
       const actions = buildNode('div', 'actions');
+      actions.appendChild(editBtn);
       actions.appendChild(deleteBtn);
 
       const item = buildNode('div', 'voucher-item ' + (isValid ? 'valid' : 'expired'));

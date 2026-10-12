@@ -39,6 +39,9 @@ What is covered:
 - voucher codes: pasted spaces/newlines trimmed, usual-length codes saved
   without warning, odd-length codes warn (without blocking) as soon as
   focus leaves the code field
+- editing: "Edit" loads a voucher into the form (submit relabeled,
+  Cancel appears), saving updates it in place (unchanged code not treated
+  as a duplicate) with a success message, Cancel exits without changes
 - toolbar badge on the extension icon: empty with no vouchers, and the count
   of valid vouchers with seeded storage (expired filtered out) — read from
   the toolbar button in chrome context; the button is pinned to the nav-bar

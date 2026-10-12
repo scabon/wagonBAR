@@ -451,6 +451,56 @@ def popup_tests(s):
               any(v["code"] == "TOOLONGCODE" for v in st["store"])
               and st["status"]["hidden"],
               (st["status"], st["store"]))
+
+        # edit: loading a voucher into the form and saving the changes
+        def form_state():
+            return json.loads(s.page_js(
+                "return JSON.stringify({"
+                " code: document.getElementById('voucherCode').value,"
+                " date: document.getElementById('expiryDate').value,"
+                " submit: document.getElementById('submitBtn').textContent,"
+                " cancelHidden: document.getElementById('cancelEditBtn').hidden});"
+            ))
+
+        idx = next(i for i, it in enumerate(st["items"]) if "GPLI089N3" in it["text"])
+        s.page_js("document.querySelectorAll('.voucher-item .edit-btn')[%d].click();"
+                  "return 'ok';" % idx)
+        time.sleep(0.4)
+        fst = form_state()
+        check("popup: edit loads voucher into the form",
+              fst["code"] == "GPLI089N3" and fst["date"] == "2027-03-02"
+              and fst["submit"] == "Update Voucher"
+              and fst["cancelHidden"] is False, fst)
+
+        # unchanged code must not count as a duplicate of itself
+        popup_add(s, "GPLI089N3", "2027-04-01")
+        time.sleep(0.6)
+        st = pstate(s)
+        fst = form_state()
+        check("popup: edited voucher updated in place, success shown",
+              any(v["code"] == "GPLI089N3" and v["expiryDate"] == "2027-04-01"
+                  for v in st["store"])
+              and len(st["store"]) == 6
+              and not st["status"]["hidden"]
+              and "updated" in st["status"]["text"].lower()
+              and fst["code"] == "" and fst["submit"] == "Add Voucher"
+              and fst["cancelHidden"] is True,
+              (st["status"], fst, st["store"]))
+
+        # cancel leaves edit mode without touching anything
+        s.page_js("document.querySelectorAll('.voucher-item .edit-btn')[%d].click();"
+                  "return 'ok';" % idx)
+        time.sleep(0.4)
+        s.page_js("document.getElementById('cancelEditBtn').click(); return 'ok';")
+        time.sleep(0.2)
+        fst = form_state()
+        st = pstate(s)
+        check("popup: cancel exits edit mode and clears the form",
+              fst["code"] == "" and fst["date"] == ""
+              and fst["submit"] == "Add Voucher" and fst["cancelHidden"] is True
+              and any(v["code"] == "GPLI089N3" and v["expiryDate"] == "2027-04-01"
+                      for v in st["store"]),
+              (fst, st["store"]))
     finally:
         if httpd:
             httpd.shutdown()
