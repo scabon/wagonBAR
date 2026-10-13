@@ -39,13 +39,14 @@ Notes:
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
 import threading
 import time
 import zipfile
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import quote
@@ -209,22 +210,111 @@ SHIM = """
     var m = /e2e-seed=([^&]+)/.exec(location.search);
     if (m) seed = JSON.parse(decodeURIComponent(m[1]));
   } catch (e) {}
-  var store = {vouchers: seed};
   var alerts = [];
   var confirms = [];
-  function sync(){
-    root.setAttribute('data-e2e-store', JSON.stringify(store.vouchers));
-    root.setAttribute('data-e2e-alerts', JSON.stringify(alerts));
-    root.setAttribute('data-e2e-confirms', JSON.stringify(confirms));
+  function clone(x){ return JSON.parse(JSON.stringify(x)); }
+  var umbrella = [];
+  function fire(area, changes){
+    setTimeout(function(){
+      umbrella.forEach(function(l){ try { l(clone(changes), area); } catch(e){} });
+    }, 0);
   }
-  window.alert = function(m){ alerts.push(String(m)); sync(); };
-  window.confirm = function(){ confirms.push('called'); sync(); return true; };
-  window.browser = {storage: {local: {
-    get: function(k){ return Promise.resolve(JSON.parse(JSON.stringify(store))); },
-    set: function(obj){ Object.assign(store, JSON.parse(JSON.stringify(obj)));
-                        sync(); return Promise.resolve(); }
-  }}};
-  sync();
+  // A mock storage area that fires change events (oldValue/newValue per
+  // key), mirroring browser.storage semantics for the sync tests
+  function makeArea(name, initial, attrs){
+    var store = initial;
+    var listeners = [];
+    function refresh(){
+      attrs.forEach(function(a){
+        root.setAttribute(a[0], JSON.stringify(a[1]()));
+      });
+    }
+    function notify(changes){
+      setTimeout(function(){
+        listeners.forEach(function(l){ try { l(clone(changes), name); } catch(e){} });
+      }, 0);
+      fire(name, changes);
+    }
+    return {
+      get: function(k){ return Promise.resolve(clone(store)); },
+      set: function(obj){
+        var changes = {};
+        Object.keys(obj).forEach(function(k){
+          changes[k] = { oldValue: (k in store) ? clone(store[k]) : undefined,
+                          newValue: clone(obj[k]) };
+        });
+        Object.assign(store, obj);
+        refresh();
+        notify(changes);
+        return Promise.resolve();
+      },
+      remove: function(keys){
+        var arr = Array.isArray(keys) ? keys : [keys];
+        var changes = {};
+        arr.forEach(function(k){
+          changes[k] = { oldValue: (k in store) ? clone(store[k]) : undefined,
+                          newValue: undefined };
+          delete store[k];
+        });
+        refresh();
+        notify(changes);
+        return Promise.resolve();
+      },
+      getBytesInUse: function(){ return Promise.resolve(0); },
+      onChanged: { addListener: function(l){ listeners.push(l); },
+                   removeListener: function(l){
+                     var i = listeners.indexOf(l);
+                     if (i >= 0) listeners.splice(i, 1);
+                   } }
+    };
+  }
+  var localStore = { vouchers: seed };
+  var syncStore = {};
+  var localArea = makeArea('local', localStore, [
+    ['data-e2e-store', function(){ return localStore.vouchers || []; }],
+    ['data-e2e-device', function(){ return localStore.deviceId || ''; }]
+  ]);
+  var syncArea = makeArea('sync', syncStore, [
+    ['data-e2e-sync-store', function(){ return syncStore; }]
+  ]);
+  window.alert = function(m){ alerts.push(String(m));
+    root.setAttribute('data-e2e-alerts', JSON.stringify(alerts)); };
+  window.confirm = function(){ confirms.push('called');
+    root.setAttribute('data-e2e-confirms', JSON.stringify(confirms));
+    return true; };
+  window.browser = {
+    storage: {
+      local: localArea,
+      sync: syncArea,
+      onChanged: { addListener: function(l){ umbrella.push(l); },
+                   removeListener: function(l){
+                     var i = umbrella.indexOf(l);
+                     if (i >= 0) umbrella.splice(i, 1);
+                   } }
+    },
+    action: {
+      setBadgeText: function(d){
+        root.setAttribute('data-e2e-badge', (d && d.text) ? d.text : '');
+        return Promise.resolve();
+      },
+      setBadgeBackgroundColor: function(){ return Promise.resolve(); },
+      setBadgeTextColor: function(){ return Promise.resolve(); }
+    }
+  };
+  // Test channel for the sync area: Marionette scripts cannot call page
+  // functions, so commands travel through a DOM attribute + event
+  document.addEventListener('e2e-sync-cmd', function(){
+    var cmd = {};
+    try { cmd = JSON.parse(root.getAttribute('data-e2e-sync-cmd') || '{}'); } catch(e){}
+    if (cmd.op === 'set') syncArea.set(cmd.items);
+    else if (cmd.op === 'remove') syncArea.remove(cmd.keys);
+  });
+  root.setAttribute('data-e2e-store', JSON.stringify(seed));
+  root.setAttribute('data-e2e-sync-store', '{}');
+  root.setAttribute('data-e2e-device', '');
+  root.setAttribute('data-e2e-alerts', JSON.stringify(alerts));
+  root.setAttribute('data-e2e-confirms', JSON.stringify(confirms));
+  root.setAttribute('data-e2e-badge', '');
 })();
 """
 
@@ -233,10 +323,20 @@ def build_popup_test_page(port):
     d = tempfile.mkdtemp(prefix="wagonbar-popup-test-")
     for f in ("popup.css", "popup.js"):
         shutil.copy(os.path.join(POPUP_DIR, f), os.path.join(d, f))
+    # the test page runs the whole stack: popup + badge logic + the sync
+    # engine, all against the storage shim below
+    shutil.copy(os.path.join(EXT_DIR, "shared", "sync-common.js"),
+                os.path.join(d, "sync-common.js"))
+    shutil.copy(os.path.join(EXT_DIR, "background", "background.js"),
+                os.path.join(d, "background.js"))
+    shutil.copy(os.path.join(EXT_DIR, "background", "sync.js"),
+                os.path.join(d, "sync.js"))
     html = open(os.path.join(POPUP_DIR, "popup.html"), encoding="utf-8").read()
-    # the browser-polyfill script only runs inside a real extension; the
-    # test page runs against the storage shim below instead
+    # the vendor polyfill and the shared script only run inside a real
+    # extension; the test page runs against the shim instead (the shared
+    # script is re-injected after it, with test-page-relative paths)
     html = html.replace('  <script src="../vendor/browser-polyfill.js"></script>\n', '')
+    html = html.replace('  <script src="../shared/sync-common.js"></script>\n', '')
     # The real popup is exactly as wide as the container (350px); constrain
     # the test page the same way so wrapping matches the popup
     html = html.replace('<link rel="stylesheet" href="popup.css">',
@@ -244,7 +344,10 @@ def build_popup_test_page(port):
                         '<style>body{max-width:350px}</style>')
     shim_tag = "<script>%s</script>" % SHIM
     html = html.replace("<script src=\"popup.js\"></script>",
-                        shim_tag + "\n  <script src=\"popup.js\"></script>")
+                        shim_tag + "\n  <script src=\"sync-common.js\"></script>"
+                        + "\n  <script src=\"background.js\"></script>"
+                        + "\n  <script src=\"sync.js\"></script>"
+                        + "\n  <script src=\"popup.js\"></script>")
     with open(os.path.join(d, "test-popup.html"), "w", encoding="utf-8") as fh:
         fh.write(html)
     return d, "http://127.0.0.1:%d/test-popup.html" % port
@@ -262,7 +365,11 @@ def pstate(s):
         " confirms: JSON.parse(document.documentElement.getAttribute('data-e2e-confirms') || '[]'),"
         " status: (function(){ var s = document.getElementById('statusMessage');"
         "          return { hidden: s.hidden, text: s.textContent }; })(),"
-        " store: JSON.parse(document.documentElement.getAttribute('data-e2e-store') || '[]')"
+        " store: JSON.parse(document.documentElement.getAttribute('data-e2e-store') || '[]'),"
+        " syncStore: JSON.parse(document.documentElement.getAttribute('data-e2e-sync-store') || '{}'),"
+        " badge: document.documentElement.getAttribute('data-e2e-badge') || '',"
+        " deviceId: (function(){ var v = document.documentElement.getAttribute('data-e2e-device') || '';"
+        "            try { return JSON.parse(v); } catch (e) { return ''; } })()"
         "});"
     ))
 
@@ -651,6 +758,102 @@ def popup_tests(s):
               and "expired" not in st["items"][0]["cls"]
               and ("Expires: " + today_d) in st["items"][0]["text"],
               (st["total"], st["valid"], st["items"]))
+
+        # ---- cross-device sync (the whole stack runs in the test page:
+        # popup.js pushes user actions to the sync area, background sync
+        # engine merges remote changes back into local storage) ----
+        def sync_cmd(payload):
+            # Marionette scripts run sandboxed: commands for the mocked
+            # sync area travel through a DOM attribute + custom event
+            s.page_js(
+                "document.documentElement.setAttribute('data-e2e-sync-cmd', %s);"
+                "document.dispatchEvent(new CustomEvent('e2e-sync-cmd'));"
+                "return 'ok';" % json.dumps(json.dumps(payload)))
+
+        def soon_ts(seconds):
+            return (datetime.now(timezone.utc) + timedelta(seconds=seconds)
+                    ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        # seeded local vouchers migrate into the sync area on startup
+        s.client.navigate(url + "?e2e-seed=" + quote(json.dumps([
+            {"id": "seed-sync-1", "code": "E2E-SEED-SYNC",
+             "expiryDate": "2029-01-01",
+             "createdAt": "2026-09-29T00:00:00.000Z"}])))
+        time.sleep(1)
+        st = pstate(s)
+        rec = st["syncStore"].get("voucher-seed-sync-1")
+        check("sync: existing local vouchers are pushed to sync on startup",
+              rec is not None and rec.get("code") == "E2E-SEED-SYNC"
+              and rec.get("by") == st["deviceId"], st["syncStore"])
+
+        # a voucher added by the user mirrors to the sync area
+        popup_add(s, "E2E-SYNC-1", "2027-12-01")
+        time.sleep(0.9)
+        st = pstate(s)
+        rec = next((v for v in st["syncStore"].values()
+                    if v.get("code") == "E2E-SYNC-1"), None)
+        sync_key = next((k for k, v in st["syncStore"].items()
+                         if v.get("code") == "E2E-SYNC-1"), None)
+        check("sync: user add mirrors to the sync area per-voucher key",
+              rec is not None and sync_key and sync_key.startswith("voucher-")
+              and rec.get("expiryDate") == "2027-12-01"
+              and rec.get("updatedAt") and rec.get("by") == st["deviceId"],
+              st["syncStore"])
+
+        # a voucher arriving from another device shows up without any
+        # local user action (list, counters, badge)
+        sync_cmd({"op": "set", "items": {"voucher-e2e-remote-1": {
+            "id": "e2e-remote-1", "code": "E2E-REMOTE-1",
+            "expiryDate": "2027-11-01",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": soon_ts(60), "by": "e2e-other-device"}}})
+        time.sleep(0.9)
+        st = pstate(s)
+        codes = [i["text"].split("Expires")[0].strip() for i in st["items"]]
+        check("sync: remote voucher merges in and updates list, counters, badge",
+              "E2E-REMOTE-1" in codes and st["total"] == "3"
+              and st["valid"] == "3" and st["badge"] == "3",
+              (codes, st["total"], st["valid"], st["badge"]))
+
+        # a newer remote edit wins over the local copy
+        sync_cmd({"op": "set", "items": {sync_key: {
+            "id": sync_key[len("voucher-"):], "code": "E2E-SYNC-1",
+            "expiryDate": "2028-01-01",
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "updatedAt": soon_ts(120), "by": "e2e-other-device"}}})
+        time.sleep(0.9)
+        st = pstate(s)
+        check("sync: newer remote edit overwrites the local copy",
+              any("E2E-SYNC-1" in i["text"] and "2028-01-01" in i["text"]
+                  for i in st["items"])
+              and any(v.get("expiryDate") == "2028-01-01" for v in st["store"]),
+              st["items"])
+
+        # a remote tombstone removes the voucher locally
+        sync_cmd({"op": "set", "items": {sync_key: {
+            "deleted": True,
+            "updatedAt": soon_ts(180), "by": "e2e-other-device"}}})
+        time.sleep(0.9)
+        st = pstate(s)
+        codes = [i["text"].split("Expires")[0].strip() for i in st["items"]]
+        check("sync: remote tombstone removes the voucher locally",
+              "E2E-SYNC-1" not in codes and st["total"] == "2",
+              (codes, st["total"]))
+
+        # deleting locally mirrors as a tombstone, not as a key removal
+        s.page_js("var b = document.querySelector('.voucher-item .delete-btn');"
+                  "b.click(); return 'ok';")
+        time.sleep(0.4)
+        s.page_js("var b = document.querySelector('.voucher-item .delete-btn');"
+                  "if (b) b.click(); return 'ok';")
+        time.sleep(1.0)
+        st = pstate(s)
+        tomb = st["syncStore"].get("voucher-e2e-remote-1")
+        check("sync: local delete mirrors as a tombstone",
+              tomb is not None and tomb.get("deleted") is True
+              and tomb.get("by") == st["deviceId"]
+              and st["total"] == "1",
+              (st["syncStore"], st["total"]))
     finally:
         if httpd:
             httpd.shutdown()
@@ -698,7 +901,12 @@ def phase_c():
     """Chromium load smoke: build the Chromium package and load it in
     headless Edge (or CHROME_BIN). The extension's service worker must
     start and show up as a DevTools target — proof that the generated
-    manifest is accepted and the polyfill/SW wiring works on Chromium."""
+    manifest is accepted and the polyfill/SW wiring works on Chromium.
+
+    The debug port is ephemeral and the browser process tree is killed
+    with taskkill /T: Edge's real browser process survives a plain
+    terminate() of the launcher, and an orphan holding the port makes
+    the next run query the previous instance's targets."""
     subprocess.run([sys.executable, os.path.join(REPO, "tools", "build-chrome.py")],
                    check=True)
     build_dir = os.path.join(REPO, "dist", "chrome-unpacked")
@@ -707,7 +915,11 @@ def phase_c():
     if not os.path.exists(chrome_bin):
         chrome_bin = "chrome.exe"
     profile = tempfile.mkdtemp(prefix="wagonbar-chrome-smoke-")
-    port = 9333
+    # pick a free port so a stale headless instance can never shadow it
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
     proc = subprocess.Popen(
         [chrome_bin, "--headless=new", "--no-first-run",
          "--no-default-browser-check", "--user-data-dir=" + profile,
@@ -729,7 +941,13 @@ def phase_c():
                    for t in targets):
                 break
     finally:
-        proc.terminate()
+        if os.name == "nt":
+            # Edge's browser process outlives terminate() of the spawned
+            # process; kill the whole tree so no orphan holds the port
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                           capture_output=True)
+        else:
+            proc.terminate()
         try:
             proc.wait(timeout=10)
         except Exception:

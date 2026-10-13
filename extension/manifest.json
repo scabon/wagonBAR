@@ -24,7 +24,9 @@
   ],
   "background": {
     "scripts": [
-      "background/background.js"
+      "background/background.js",
+      "shared/sync-common.js",
+      "background/sync.js"
     ]
   },
   "browser_specific_settings": {

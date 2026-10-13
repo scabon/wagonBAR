@@ -36,6 +36,16 @@ document.addEventListener('DOMContentLoaded', function() {
   loadVouchers();
   updateGhost();
 
+  // Re-render when the voucher list changes from outside this popup
+  // (a cross-device sync merge done by the background script)
+  if (browser.storage.onChanged) {
+    browser.storage.onChanged.addListener(function (changes, area) {
+      if (area === 'local' && changes.vouchers) {
+        loadVouchers();
+      }
+    });
+  }
+
   // Show an inline status message (no native dialogs). Warnings and
   // successes are transient: they auto-dismiss and can be clicked away.
   // Errors stay until the next action.
@@ -151,6 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
           cancelEdit();
           loadVouchers();
           showStatus('Voucher updated.', 'success');
+          syncWriteVoucher(edited);
         });
         return;
       }
@@ -182,6 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
         closeCalendar();
         updateGhost();
         loadVouchers();
+        syncWriteVoucher(newVoucher);
       });
     });
   });
@@ -445,6 +457,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       browser.storage.local.set({ vouchers: updatedVouchers }).then(function() {
         loadVouchers();
+        syncWriteVoucher({ id: id }, true);
       });
     });
   }

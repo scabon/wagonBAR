@@ -59,6 +59,15 @@ What is covered:
 - same-day expiry: a voucher expiring today counts as valid through the end
   of its expiry day in both the popup and the badge (guards against parsing
   date-only strings as UTC)
+- cross-device sync (phase a, with the event-emitting storage mock): user
+  adds mirror to the sync area per-voucher key, existing local vouchers
+  migrate into the sync area on startup, a remote voucher arrives in the
+  list/counters/badge without local action, a newer remote edit overwrites
+  the local copy, a remote tombstone removes the voucher locally, and a
+  local delete mirrors as a tombstone. Real `storage.sync` behaviour on
+  Firefox was verified manually (scratch harness, 2026-10-13); account
+  round-tripping is a manual acceptance test (two profiles on the same
+  Firefox account)
 
 Not covered: the toolbar popup panel itself (not automatable), badge
 colors (not exposed as DOM attributes).
@@ -66,7 +75,11 @@ colors (not exposed as DOM attributes).
 - Chromium load smoke (phase c): builds the Chromium package
   (`tools/build-chrome.py`) and loads it in headless Edge (or
   `CHROME_BIN`); asserts the extension is accepted and its MV3 service
-  worker starts, via the DevTools target list. Proves load + service
-  worker startup only — popup behaviour on Chromium is covered by the
-  manual checklist in extension/README.md, since the popup and
-  background code is shared with Firefox (phases a/b).
+  worker starts, via the DevTools target list. The debug port is
+  ephemeral and the browser process tree is force-killed afterwards
+  (Edge's browser process outlives a plain terminate(), and an orphan
+  holding the port makes the next run query the previous instance's
+  targets). Proves load + service worker startup only — popup
+  behaviour on Chromium is covered by the manual checklist in
+  extension/README.md, since the popup and background code is shared
+  with Firefox (phases a/b).
