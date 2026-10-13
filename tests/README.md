@@ -47,10 +47,13 @@ What is covered:
 - status messages: warnings dismissible by click and auto-expiring;
   errors stay until the next action
 - toolbar badge on the extension icon: empty with no vouchers, and the count
-  of valid vouchers with seeded storage (expired filtered out) — read from
-  the toolbar button in chrome context; the button is pinned to the nav-bar
-  via a seeded `browser.uiCustomization.state` because a fresh profile parks
-  extension buttons in the lazily-built unified-extensions panel
+  of valid vouchers with seeded storage (expired filtered out, expiring-today
+  kept) — read from the toolbar button in chrome context; the button is pinned
+  to the nav-bar via a seeded `browser.uiCustomization.state` because a fresh
+  profile parks extension buttons in the lazily-built unified-extensions panel
+- same-day expiry: a voucher expiring today counts as valid through the end
+  of its expiry day in both the popup and the badge (guards against parsing
+  date-only strings as UTC)
 
 Not covered: the toolbar popup panel itself (not automatable), badge
 colors (not exposed as DOM attributes).

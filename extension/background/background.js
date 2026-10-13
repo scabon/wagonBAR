@@ -9,9 +9,11 @@ function getValidVouchers() {
     now.setHours(0, 0, 0, 0);
 
     return vouchers.filter(v => {
-      const expiryDate = new Date(v.expiryDate);
+      // Parse as local midnight (a date-only string would be read as UTC
+      // and a voucher expiring today could look already expired)
+      const expiryDate = new Date(v.expiryDate + 'T00:00:00');
       return expiryDate >= now;
-    }).sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+    }).sort((a, b) => a.expiryDate.localeCompare(b.expiryDate));
   });
 }
 

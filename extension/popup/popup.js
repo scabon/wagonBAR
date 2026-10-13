@@ -372,7 +372,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const frag = document.createDocumentFragment();
 
     sorted.forEach(function(voucher) {
-      const expiryDate = new Date(voucher.expiryDate);
+      // Parse as local midnight: a date-only string would be read as UTC
+      // and make a voucher expiring today look already expired depending
+      // on the timezone
+      const expiryDate = new Date(voucher.expiryDate + 'T00:00:00');
       const isValid = expiryDate >= now;
 
       if (isValid) validCount++;

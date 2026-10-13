@@ -586,6 +586,22 @@ def popup_tests(s):
                                "E2E-SOON-111", "E2E-TRIM-1", "GPLI089N3",
                                "TOOLONGCODE"],
               list_codes())
+
+        # a voucher expiring today counts as valid through the end of its
+        # expiry day (date-only strings must not be parsed as UTC, which
+        # would make it look already expired depending on the timezone)
+        s.client.navigate(url)
+        time.sleep(1)
+        today_d = date.today().isoformat()
+        popup_add(s, "E2E-TODAY-1", today_d)
+        time.sleep(0.6)
+        st = pstate(s)
+        check("popup: voucher expiring today counts as valid",
+              st["total"] == "1" and st["valid"] == "1"
+              and "valid" in st["items"][0]["cls"]
+              and "expired" not in st["items"][0]["cls"]
+              and ("Expires: " + today_d) in st["items"][0]["text"],
+              (st["total"], st["valid"], st["items"]))
     finally:
         if httpd:
             httpd.shutdown()
@@ -616,12 +632,15 @@ def phase_b():
          "createdAt": "2026-09-29T00:00:00.000Z"},
         {"id": "3", "code": "E2E-FUTURE-999", "expiryDate": "2028-06-30",
          "createdAt": "2026-09-29T00:00:00.000Z"},
+        # expires today: must still count as valid (same-day boundary)
+        {"id": "4", "code": "E2E-TODAY-111", "expiryDate": date.today().isoformat(),
+         "createdAt": "2026-09-29T00:00:00.000Z"},
     ]
     s = Session(seed_vouchers=vouchers)
     try:
         check("extension installs (phase B)", s.addon_id == ADDON_ID, s.addon_id)
-        check("badge: shows count of valid vouchers (expired one filtered out)",
-              wait_for_badge(s, "2"), badge_text(s))
+        check("badge: shows count of valid vouchers (expired one filtered out, today kept)",
+              wait_for_badge(s, "3"), badge_text(s))
     finally:
         s.close()
 
