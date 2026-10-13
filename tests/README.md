@@ -13,11 +13,12 @@ Prerequisites:
 - `pip install marionette_driver`
 - pwsh for cleanup on Windows
 
-Run both phases (each launches and tears down its own Firefox instance):
+Run all phases (each launches and tears down its own browser instance):
 
 ```bash
 python tests/e2e/wagonbar_e2e.py a   # install + empty badge + popup logic
 python tests/e2e/wagonbar_e2e.py b   # seeded storage + badge count
+python tests/e2e/wagonbar_e2e.py c   # Chromium load smoke (build + Edge)
 ```
 
 The phases are separate because the storage backend caches its data file after
@@ -61,3 +62,11 @@ What is covered:
 
 Not covered: the toolbar popup panel itself (not automatable), badge
 colors (not exposed as DOM attributes).
+
+- Chromium load smoke (phase c): builds the Chromium package
+  (`tools/build-chrome.py`) and loads it in headless Edge (or
+  `CHROME_BIN`); asserts the extension is accepted and its MV3 service
+  worker starts, via the DevTools target list. Proves load + service
+  worker startup only — popup behaviour on Chromium is covered by the
+  manual checklist in extension/README.md, since the popup and
+  background code is shared with Firefox (phases a/b).

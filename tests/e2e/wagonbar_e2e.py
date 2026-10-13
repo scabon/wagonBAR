@@ -8,12 +8,15 @@ toolbar icon badge showing the number of valid vouchers.
 Usage:
     python tests/e2e/wagonbar_e2e.py a    # install + empty badge + popup logic
     python tests/e2e/wagonbar_e2e.py b    # seeded storage + badge count
+    python tests/e2e/wagonbar_e2e.py c    # Chromium load smoke (build + Edge)
 
 Requires:
     - Firefox 121+ (Manifest V3 background event page) reachable as
       ``firefox.exe`` on PATH or by full path via the FIREFOX_BIN env var
     - ``pip install marionette_driver``
     - pwsh (PowerShell 7) for orphan-process cleanup on Windows
+    - phase c only: a Chromium browser — Edge at its standard Windows
+      location (or any Chromium executable via CHROME_BIN)
 
 Notes:
     - Each phase launches its own disposable Firefox profile and cleans up
@@ -46,6 +49,7 @@ from datetime import date, timedelta
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import quote
+import urllib.request
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -230,6 +234,9 @@ def build_popup_test_page(port):
     for f in ("popup.css", "popup.js"):
         shutil.copy(os.path.join(POPUP_DIR, f), os.path.join(d, f))
     html = open(os.path.join(POPUP_DIR, "popup.html"), encoding="utf-8").read()
+    # the browser-polyfill script only runs inside a real extension; the
+    # test page runs against the storage shim below instead
+    html = html.replace('  <script src="../vendor/browser-polyfill.js"></script>\n', '')
     # The real popup is exactly as wide as the container (350px); constrain
     # the test page the same way so wrapping matches the popup
     html = html.replace('<link rel="stylesheet" href="popup.css">',
@@ -687,14 +694,65 @@ def phase_b():
         s.close()
 
 
+def phase_c():
+    """Chromium load smoke: build the Chromium package and load it in
+    headless Edge (or CHROME_BIN). The extension's service worker must
+    start and show up as a DevTools target — proof that the generated
+    manifest is accepted and the polyfill/SW wiring works on Chromium."""
+    subprocess.run([sys.executable, os.path.join(REPO, "tools", "build-chrome.py")],
+                   check=True)
+    build_dir = os.path.join(REPO, "dist", "chrome-unpacked")
+    chrome_bin = os.environ.get("CHROME_BIN") or \
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+    if not os.path.exists(chrome_bin):
+        chrome_bin = "chrome.exe"
+    profile = tempfile.mkdtemp(prefix="wagonbar-chrome-smoke-")
+    port = 9333
+    proc = subprocess.Popen(
+        [chrome_bin, "--headless=new", "--no-first-run",
+         "--no-default-browser-check", "--user-data-dir=" + profile,
+         "--remote-debugging-port=%d" % port,
+         "--load-extension=" + build_dir, "about:blank"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    targets = []
+    try:
+        for _ in range(60):
+            time.sleep(0.5)
+            try:
+                with urllib.request.urlopen(
+                        "http://127.0.0.1:%d/json/list" % port, timeout=2) as r:
+                    targets = json.load(r)
+            except Exception:
+                continue
+            if any(t.get("type") == "service_worker" and
+                   "background/service-worker.js" in t.get("url", "")
+                   for t in targets):
+                break
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except Exception:
+            proc.kill()
+        shutil.rmtree(profile, ignore_errors=True)
+    sw_urls = [t.get("url") for t in targets
+               if t.get("type") == "service_worker" and
+               "background/service-worker.js" in t.get("url", "")]
+    check("chrome: extension loads, service worker starts (headless Chromium)",
+          bool(sw_urls), sw_urls or
+          {"returncode": proc.returncode, "targets": targets[:5]})
+
+
 def main():
     phase = sys.argv[1] if len(sys.argv) > 1 else "a"
     if phase == "a":
         phase_a()
     elif phase == "b":
         phase_b()
+    elif phase == "c":
+        phase_c()
     else:
-        print("usage: wagonbar_e2e.py [a|b]")
+        print("usage: wagonbar_e2e.py [a|b|c]")
         return 2
     failed = [n for n, ok in RESULTS if not ok]
     print("\n%d checks, %d failed" % (len(RESULTS), len(failed)), flush=True)
