@@ -65,9 +65,10 @@ What is covered:
   list/counters/badge without local action, a newer remote edit overwrites
   the local copy, a remote tombstone removes the voucher locally, and a
   local delete mirrors as a tombstone. Real `storage.sync` behaviour on
-  Firefox was verified manually (scratch harness, 2026-10-13); account
-  round-tripping is a manual acceptance test (two profiles on the same
-  Firefox account)
+  Firefox was verified manually (scratch harness, 2026-10-13), and the
+  full account round-trip (web-ext dev profile → FxA servers → the
+  user's Store Firefox profile, both signed into the same account)
+  passed manually on 2026-10-13
 
 Not covered: the toolbar popup panel itself (not automatable), badge
 colors (not exposed as DOM attributes).
