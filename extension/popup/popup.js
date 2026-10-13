@@ -121,6 +121,14 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
+    // A voucher that expires today is still valid, anything earlier is not
+    const now = new Date();
+    const today = toISO(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    if (expiryDate < today) {
+      showStatus('The expiration date is in the past.', 'error');
+      return;
+    }
+
     browser.storage.local.get('vouchers').then(function(data) {
       const vouchers = data.vouchers || [];
 
@@ -284,6 +292,8 @@ document.addEventListener('DOMContentLoaded', function() {
       dayBtn.dataset.date = iso;
       if (iso === selected) dayBtn.classList.add('selected');
       if (iso === todayISO) dayBtn.classList.add('today');
+      // Past days cannot be picked (a voucher expiring today is allowed)
+      if (iso < todayISO) dayBtn.disabled = true;
       grid.appendChild(dayBtn);
     }
     calendarPanel.appendChild(grid);

@@ -45,6 +45,7 @@ import zipfile
 from datetime import date, timedelta
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
+from urllib.parse import quote
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -196,7 +197,15 @@ def wait_for_badge(s, expected, timeout=30):
 SHIM = """
 (function(){
   var root = document.documentElement;
-  var store = {vouchers: []};
+  // Loading the page with ?e2e-seed=<json> starts storage with legacy
+  // vouchers (Marionette scripts run sandboxed and cannot reach page
+  // globals, so the seed is passed through the URL instead)
+  var seed = [];
+  try {
+    var m = /e2e-seed=([^&]+)/.exec(location.search);
+    if (m) seed = JSON.parse(decodeURIComponent(m[1]));
+  } catch (e) {}
+  var store = {vouchers: seed};
   var alerts = [];
   var confirms = [];
   function sync(){
@@ -300,11 +309,20 @@ def popup_tests(s):
               not st["status"]["hidden"]
               and "fill in both fields" in st["status"]["text"], st["status"])
 
+        # an expired voucher can no longer be created through the form; load
+        # the page again with one seeded directly into storage (as legacy
+        # data) so expired rendering, sorting and the valid counter stay
+        # covered
+        expired_seed = [{"id": "seed-expired-1", "code": "E2E-EXPIRED-1",
+                         "expiryDate": "2020-01-01",
+                         "createdAt": "2026-09-29T00:00:00.000Z"}]
+        s.client.navigate(url + "?e2e-seed=" + quote(json.dumps(expired_seed)))
+        time.sleep(1)
+
         soon = date.today() + timedelta(days=7)
         soon_d = soon.strftime("%Y-%m-%d")
         popup_add(s, "E2E-FUTURE-999", "2028-06-30")
         popup_add(s, "E2E-SOON-111", soon_d)
-        popup_add(s, "E2E-EXPIRED-1", "2020-01-01")
         time.sleep(1)
 
         st = pstate(s)
@@ -361,6 +379,19 @@ def popup_tests(s):
               and "valid expiration date" in st["status"]["text"]
               and st["alerts"] == [], (st["status"], st["alerts"]))
 
+        # a date in the past is rejected (today is the earliest allowed)
+        popup_add(s, "E2E-PAST-1", "2020-01-01")
+        time.sleep(0.6)
+        st = pstate(s)
+        check("popup: past date rejected inline, nothing added",
+              len(st["items"]) == 2 and not st["status"]["hidden"]
+              and "in the past" in st["status"]["text"]
+              and st["alerts"] == [], (st["status"], st["alerts"]))
+
+        # clear the rejected date so the calendar opens on the current month
+        s.page_js("var i = document.getElementById('expiryDate');"
+                  "i.value = ''; i.dispatchEvent(new Event('input')); return 'ok';")
+
         # custom calendar widget: icon opens a month grid, picking a day
         # fills the field and closes the grid
         s.page_js("document.getElementById('calendarToggle').click(); return 'ok';")
@@ -375,6 +406,17 @@ def popup_tests(s):
         check("calendar: icon opens month grid for the current month",
               cal["hidden"] is False and 28 <= cal["days"] <= 31
               and str(now.tm_year) in cal["title"], cal)
+
+        # days before today cannot be picked; today stays selectable
+        cal_dis = json.loads(s.page_js(
+            "var p = document.getElementById('calendarPanel');"
+            "return JSON.stringify({"
+            " pastDisabled: p.querySelectorAll('.calendar-day:disabled').length,"
+            " todayDisabled: p.querySelector('.calendar-day.today').disabled});"
+        ))
+        check("calendar: past days disabled, today still selectable",
+              cal_dis["pastDisabled"] == now.tm_mday - 1
+              and cal_dis["todayDisabled"] is False, cal_dis)
 
         s.page_js(
             "document.getElementById('calendarPanel')"

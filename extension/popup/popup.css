@@ -209,6 +209,16 @@ input[type="date"]:focus {
   color: white;
 }
 
+.calendar-day:disabled {
+  color: var(--label-color);
+  cursor: default;
+}
+
+.calendar-day:disabled:hover {
+  background: none;
+  color: var(--label-color);
+}
+
 .calendar-day.selected {
   background: #0066cc;
   color: white;

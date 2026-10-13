@@ -33,9 +33,13 @@ What is covered:
   (Firefox blocks automation of real extension pages); asserts that no
   native `alert`/`confirm` dialogs are used. Also covers the custom date
   entry: typed YYYY-MM-DD dates, impossible dates (Feb 31) rejected
-  inline, dashes auto-inserted while typing with the remaining format
+  inline, dates in the past rejected inline (today is the earliest
+  allowed), dashes auto-inserted while typing with the remaining format
   shown as a grey hint, and the calendar widget (opens on the icon,
-  picking a day fills the field and closes)
+  past days disabled, today selectable, picking a day fills the field
+  and closes). Expired vouchers can no longer be created through the
+  form, so expired rendering is covered with storage seeded directly
+  (legacy data)
 - voucher codes: pasted spaces/newlines trimmed, usual-length codes saved
   without warning, odd-length codes warn (without blocking) as soon as
   focus leaves the code field
