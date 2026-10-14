@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const voucherList = document.getElementById('voucherList');
   const totalVouchersSpan = document.getElementById('totalVouchers');
   const validVouchersSpan = document.getElementById('validVouchers');
+  const validValueSpan = document.getElementById('validValue');
   const statusMessage = document.getElementById('statusMessage');
   const submitBtn = document.getElementById('submitBtn');
   const cancelEditBtn = document.getElementById('cancelEditBtn');
@@ -61,10 +62,12 @@ document.addEventListener('DOMContentLoaded', function() {
       confirmQuestion: 'Confirm?',
       sortByDate: 'By date',
       sortByCode: 'By code',
+      sortByValue: 'By value',
       sortOrder: 'Sort order',
       emptyMessage: 'No vouchers yet. Add one above!',
       statsTotal: 'Total',
       statsValid: 'Valid',
+      statsValue: 'Value',
       statsVouchers: 'vouchers',
       settingsTheme: 'Theme',
       themeSystem: 'System',
@@ -137,10 +140,12 @@ document.addEventListener('DOMContentLoaded', function() {
       confirmQuestion: 'Confirmer ?',
       sortByDate: 'Par date',
       sortByCode: 'Par code',
+      sortByValue: 'Par valeur',
       sortOrder: 'Ordre de tri',
       emptyMessage: 'Aucun bon pour l\u2019instant. Ajoutez-en un ci-dessus !',
       statsTotal: 'Total',
       statsValid: 'Valides',
+      statsValue: 'Valeur',
       statsVouchers: 'bons',
       settingsTheme: 'Th\u00e8me',
       themeSystem: 'Syst\u00e8me',
@@ -648,7 +653,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // Load vouchers from storage, applying the remembered sort order
   function loadVouchers() {
     browser.storage.local.get(['vouchers', 'sortOrder']).then(function(data) {
-      sortSelect.value = data.sortOrder === 'code' ? 'code' : 'date';
+      sortSelect.value =
+          (data.sortOrder === 'code' || data.sortOrder === 'value')
+              ? data.sortOrder : 'date';
       renderVouchers(data.vouchers || []);
     });
   }
@@ -778,11 +785,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Render vouchers in the list, sorted by date or by code
+  // Render vouchers in the list, sorted by date, code or value
   function renderVouchers(vouchers) {
     const sorted = vouchers.slice();
     if (sortSelect.value === 'code') {
       sorted.sort((a, b) => a.code.localeCompare(b.code));
+    } else if (sortSelect.value === 'value') {
+      // Highest amount first; vouchers without a value last, ties
+      // broken by the earliest expiry date
+      sorted.sort((a, b) => {
+        const av = (a.amount === undefined || a.amount === null) ? -1 : a.amount;
+        const bv = (b.amount === undefined || b.amount === null) ? -1 : b.amount;
+        if (av !== bv) return bv - av;
+        return new Date(a.expiryDate) - new Date(b.expiryDate);
+      });
     } else {
       sorted.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
     }
@@ -791,6 +807,7 @@ document.addEventListener('DOMContentLoaded', function() {
       voucherList.replaceChildren(buildNode('p', 'empty-message', t('emptyMessage')));
       totalVouchersSpan.textContent = '0';
       validVouchersSpan.textContent = '0';
+      validValueSpan.textContent = '0';
       removeExpiredBtn.hidden = true;
       return;
     }
@@ -800,6 +817,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let validCount = 0;
     let expiredCount = 0;
+    let validValue = 0;
     const frag = document.createDocumentFragment();
 
     sorted.forEach(function(voucher) {
@@ -809,8 +827,14 @@ document.addEventListener('DOMContentLoaded', function() {
       const expiryDate = new Date(voucher.expiryDate + 'T00:00:00');
       const isValid = expiryDate >= now;
 
-      if (isValid) validCount++;
-      else expiredCount++;
+      if (isValid) {
+        validCount++;
+        if (voucher.amount !== undefined && voucher.amount !== null) {
+          validValue += voucher.amount;
+        }
+      } else {
+        expiredCount++;
+      }
 
       const info = buildNode('div');
       info.appendChild(buildNode('div', 'code', voucher.code));
@@ -839,6 +863,9 @@ document.addEventListener('DOMContentLoaded', function() {
     voucherList.replaceChildren(frag);
     totalVouchersSpan.textContent = vouchers.length;
     validVouchersSpan.textContent = validCount;
+    let valueText = String(Math.round(validValue * 100) / 100);
+    if (currentLang === 'fr') valueText = valueText.replace('.', ',');
+    validValueSpan.textContent = valueText;
 
     // The bulk-clear action only makes sense when an expired voucher exists
     removeExpiredBtn.hidden = expiredCount === 0;

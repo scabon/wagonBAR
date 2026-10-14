@@ -401,6 +401,7 @@ def pstate(s):
         "   {return {cls: e.className, text: e.innerText.replace(/\\s+/g,' ').trim()};}),"
         " total: document.getElementById('totalVouchers').textContent,"
         " valid: document.getElementById('validVouchers').textContent,"
+        " value: document.getElementById('validValue').textContent,"
         " empty: document.getElementById('voucherList').innerText.trim(),"
         " alerts: JSON.parse(document.documentElement.getAttribute('data-e2e-alerts') || '[]'),"
         " confirms: JSON.parse(document.documentElement.getAttribute('data-e2e-confirms') || '[]'),"
@@ -1073,6 +1074,27 @@ def popup_tests(s):
         check("value: edit loads the amount, comma decimals accepted",
               loaded == "25" and rec.get("amount") == 30.5,
               (loaded, rec))
+
+        # stats show the summed value of the valid vouchers
+        st = pstate(s)
+        check("value: stats sum the valid vouchers' amounts",
+              st["total"] == "2" and st["valid"] == "2"
+              and st["value"] == "30.5", (st["total"], st["valid"], st["value"]))
+
+        # sort by value: highest first, no-amount vouchers last
+        popup_add(s, "E2E-VAL-2", "2027-01-01", "50")
+        time.sleep(0.6)
+        s.page_js("var s = document.getElementById('sortOrder');"
+                  "s.value = 'value'; s.dispatchEvent(new Event('change'));"
+                  "return 'ok';")
+        time.sleep(0.5)
+        st = pstate(s)
+        # voucher codes never contain spaces; the item text also carries
+        # the amount and expiry lines, so take the first token
+        codes = [i["text"].split(" ")[0] for i in st["items"]]
+        check("value: sort by value puts the highest first, no-amount last",
+              codes == ["E2E-VAL-2", "E2E-VAL-1", "E2E-NOVAL-1"]
+              and st["value"] == "80.5", (codes, st["value"]))
 
         # ---- cross-device sync (the whole stack runs in the test page:
         # popup.js pushes user actions to the sync area, background sync
