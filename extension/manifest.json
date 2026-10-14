@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "SNCF Voucher Reminder",
+  "name": "wagonBar",
   "version": "1.4",
   "description": "Manage SNCF Connect vouchers and get reminders when you have valid vouchers to use",
   "icons": {
@@ -17,7 +17,7 @@
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     },
-    "default_title": "SNCF Voucher Reminder"
+    "default_title": "wagonBar"
   },
   "permissions": [
     "storage"
