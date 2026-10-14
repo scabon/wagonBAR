@@ -20,13 +20,16 @@
     "default_title": "wagonBar"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "tabs",
+    "notifications"
   ],
   "background": {
     "scripts": [
       "background/background.js",
       "shared/sync-common.js",
-      "background/sync.js"
+      "background/sync.js",
+      "background/sncf-notify.js"
     ]
   },
   "browser_specific_settings": {

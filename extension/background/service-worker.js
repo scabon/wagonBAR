@@ -3,4 +3,5 @@
 // worker, which imports the browser.* polyfill first and then the shared
 // background and sync logic (unchanged for both engines).
 importScripts('/vendor/browser-polyfill.js', '/shared/sync-common.js',
-              '/background/background.js', '/background/sync.js');
+              '/background/background.js', '/background/sync.js',
+              '/background/sncf-notify.js');

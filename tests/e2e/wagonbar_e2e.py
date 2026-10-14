@@ -221,6 +221,8 @@ SHIM = """
   } catch (e) {}
   var alerts = [];
   var confirms = [];
+  var notifLog = [];
+  var tabUpdatedListeners = [];
   function clone(x){ return JSON.parse(JSON.stringify(x)); }
   var umbrella = [];
   function fire(area, changes){
@@ -309,6 +311,21 @@ SHIM = """
       },
       setBadgeBackgroundColor: function(){ return Promise.resolve(); },
       setBadgeTextColor: function(){ return Promise.resolve(); }
+    },
+    notifications: {
+      create: function(opts){
+        notifLog.push({title: opts.title, message: opts.message});
+        root.setAttribute('data-e2e-notifications', JSON.stringify(notifLog));
+        return Promise.resolve('e2e-notif-' + notifLog.length);
+      },
+      clear: function(){ return Promise.resolve(true); },
+      getAll: function(){ return Promise.resolve({}); },
+      onClicked: { addListener: function(){}, removeListener: function(){} }
+    },
+    tabs: {
+      onUpdated: { addListener: function(l){ tabUpdatedListeners.push(l); },
+                    removeListener: function(){} },
+      onRemoved: { addListener: function(){}, removeListener: function(){} }
     }
   };
   // Test channel for the sync area: Marionette scripts cannot call page
@@ -318,11 +335,21 @@ SHIM = """
     try { cmd = JSON.parse(root.getAttribute('data-e2e-sync-cmd') || '{}'); } catch(e){}
     if (cmd.op === 'set') syncArea.set(cmd.items);
     else if (cmd.op === 'remove') syncArea.remove(cmd.keys);
+    else if (cmd.op === 'local-set') localArea.set(cmd.items);
+    else if (cmd.op === 'tab-complete') {
+      // simulate a tab finishing a page load (what background/sncf-notify.js
+      // listens to in a real browser)
+      tabUpdatedListeners.forEach(function(l){
+        try { l(cmd.tabId, {status: 'complete', url: cmd.url},
+                   {id: cmd.tabId, url: cmd.url}); } catch(e){}
+      });
+    }
   });
   root.setAttribute('data-e2e-store', JSON.stringify(seed));
   root.setAttribute('data-e2e-sync-store', '{}');
   root.setAttribute('data-e2e-device', '');
   root.setAttribute('data-e2e-settings', '{}');
+  root.setAttribute('data-e2e-notifications', '[]');
   root.setAttribute('data-e2e-alerts', JSON.stringify(alerts));
   root.setAttribute('data-e2e-confirms', JSON.stringify(confirms));
   root.setAttribute('data-e2e-badge', '');
@@ -342,6 +369,8 @@ def build_popup_test_page(port):
                 os.path.join(d, "background.js"))
     shutil.copy(os.path.join(EXT_DIR, "background", "sync.js"),
                 os.path.join(d, "sync.js"))
+    shutil.copy(os.path.join(EXT_DIR, "background", "sncf-notify.js"),
+                os.path.join(d, "sncf-notify.js"))
     html = open(os.path.join(POPUP_DIR, "popup.html"), encoding="utf-8").read()
     # the vendor polyfill and the shared script only run inside a real
     # extension; the test page runs against the shim instead (the shared
@@ -358,6 +387,7 @@ def build_popup_test_page(port):
                         shim_tag + "\n  <script src=\"sync-common.js\"></script>"
                         + "\n  <script src=\"background.js\"></script>"
                         + "\n  <script src=\"sync.js\"></script>"
+                        + "\n  <script src=\"sncf-notify.js\"></script>"
                         + "\n  <script src=\"popup.js\"></script>")
     with open(os.path.join(d, "test-popup.html"), "w", encoding="utf-8") as fh:
         fh.write(html)
@@ -378,6 +408,7 @@ def pstate(s):
         "          return { hidden: s.hidden, text: s.textContent }; })(),"
         " store: JSON.parse(document.documentElement.getAttribute('data-e2e-store') || '[]'),"
         " settings: JSON.parse(document.documentElement.getAttribute('data-e2e-settings') || '{}'),"
+        " notifications: JSON.parse(document.documentElement.getAttribute('data-e2e-notifications') || '[]'),"
         " syncStore: JSON.parse(document.documentElement.getAttribute('data-e2e-sync-store') || '{}'),"
         " badge: document.documentElement.getAttribute('data-e2e-badge') || '',"
         " deviceId: (function(){ var v = document.documentElement.getAttribute('data-e2e-device') || '';"
@@ -923,6 +954,77 @@ def popup_tests(s):
               fr["h1"] == "wagonBar \u2014 Bons SNCF"
               and fr["empty"] == "Aucun bon pour l\u2019instant. Ajoutez-en un ci-dessus !"
               and fr["removeExpired"]["hidden"] is True, fr)
+
+        # ---- SNCF site arrival notification (tabs/notifications are
+        # mocked by the test-page shim) ----
+        def page_cmd(payload):
+            s.page_js(
+                "document.documentElement.setAttribute('data-e2e-sync-cmd', %s);"
+                "document.dispatchEvent(new CustomEvent('e2e-sync-cmd'));"
+                "return 'ok';" % json.dumps(json.dumps(payload)))
+
+        def tab_complete(tab_id, page_url):
+            page_cmd({"op": "tab-complete", "tabId": tab_id, "url": page_url})
+
+        s.client.navigate(url + "?e2e-seed=" + quote(json.dumps([
+            {"id": "seed-n-1", "code": "E2E-NOTIF-1",
+             "expiryDate": "2027-01-01",
+             "createdAt": "2026-09-29T00:00:00.000Z"},
+            {"id": "seed-n-2", "code": "E2E-NOTIF-2",
+             "expiryDate": "2026-12-01",
+             "createdAt": "2026-09-29T00:00:00.000Z"},
+            {"id": "seed-n-3", "code": "E2E-OLDEXP-9",
+             "expiryDate": "2020-01-01",
+             "createdAt": "2026-09-29T00:00:00.000Z"}])))
+        time.sleep(1)
+
+        tab_complete(11, "https://www.sncf-connect.com/")
+        time.sleep(0.8)
+        st = pstate(s)
+        check("notify: SNCF arrival fires one notification with the valid count",
+              len(st["notifications"]) == 1
+              and st["notifications"][0]["title"] == "wagonBar"
+              and "You have 2 valid vouchers" in st["notifications"][0]["message"]
+              and "2026-12-01" in st["notifications"][0]["message"],
+              st["notifications"])
+
+        tab_complete(11, "https://www.sncf-connect.com/")
+        time.sleep(0.5)
+        st = pstate(s)
+        check("notify: repeat loads of the same visit stay silent",
+              len(st["notifications"]) == 1, st["notifications"])
+
+        tab_complete(11, "https://www.example.com/")
+        tab_complete(11, "https://www.sncf-connect.com/mon-compte")
+        time.sleep(0.8)
+        st = pstate(s)
+        check("notify: a new visit after leaving the site notifies again",
+              len(st["notifications"]) == 2, st["notifications"])
+
+        # the Settings toggle disables the notification
+        page_cmd({"op": "local-set", "items":
+                  {"settings": {"theme": "system", "language": "system",
+                                "notifications": False}}})
+        time.sleep(0.3)
+        tab_complete(12, "https://app.sncf-connect.com/")
+        time.sleep(0.8)
+        st = pstate(s)
+        check("notify: the settings toggle turns the notification off",
+              len(st["notifications"]) == 2, st["notifications"])
+
+        # a tab with no valid vouchers never notifies
+        page_cmd({"op": "local-set", "items":
+                  {"settings": {"theme": "system", "language": "system",
+                                "notifications": True},
+                   "vouchers": [{"id": "seed-n-3", "code": "E2E-OLDEXP-9",
+                                 "expiryDate": "2020-01-01",
+                                 "createdAt": "2026-09-29T00:00:00.000Z"}]}})
+        time.sleep(0.3)
+        tab_complete(13, "https://www.sncf-connect.com/")
+        time.sleep(0.8)
+        st = pstate(s)
+        check("notify: no notification when no voucher is valid",
+              len(st["notifications"]) == 2, st["notifications"])
 
         # ---- cross-device sync (the whole stack runs in the test page:
         # popup.js pushes user actions to the sync area, background sync
