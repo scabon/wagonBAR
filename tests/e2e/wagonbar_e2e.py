@@ -843,7 +843,7 @@ def popup_tests(s):
             "var m = document.getElementById('menuPanel');"
             "return JSON.stringify({hidden: m.hidden,"
             " entries: Array.from(m.querySelectorAll('button')).map(function(b)"
-            "  {return b.textContent;})});"))
+            "  {return b.textContent.replace(/\\s+/g, ' ').trim();})});"))
         check("menu: hamburger opens a menu with Settings/Help/About",
               menu["hidden"] is False
               and menu["entries"] == ["Settings", "Help", "About"], menu)

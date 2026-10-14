@@ -202,11 +202,14 @@ document.addEventListener('DOMContentLoaded', function() {
     return s;
   }
 
-  // Apply the current language to every tagged node in the static markup
+  // Apply the current language to every tagged node in the static markup.
+  // data-flag carries a decorative prefix (language-selector flags) that
+  // stays put while the label text is swapped
   function applyI18n() {
     document.documentElement.lang = currentLang === 'fr' ? 'fr' : 'en';
     document.querySelectorAll('[data-i18n]').forEach(function(node) {
-      node.textContent = t(node.dataset.i18n);
+      node.textContent = (node.dataset.flag ? node.dataset.flag + ' ' : '') +
+                         t(node.dataset.i18n);
     });
     document.querySelectorAll('[data-i18n-placeholder]').forEach(function(node) {
       node.placeholder = t(node.dataset.i18nPlaceholder);

@@ -502,7 +502,9 @@ input[type="date"]:focus {
 }
 
 .menu-panel button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 8px 14px;
   border: none;
@@ -511,6 +513,10 @@ input[type="date"]:focus {
   font-size: 14px;
   color: var(--text-color);
   cursor: pointer;
+}
+
+.menu-panel button svg {
+  flex-shrink: 0;
 }
 
 .menu-panel button:hover {
