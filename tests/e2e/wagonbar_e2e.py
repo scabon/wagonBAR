@@ -202,6 +202,15 @@ def wait_for_badge(s, expected, timeout=30):
 SHIM = """
 (function(){
   var root = document.documentElement;
+  // Deterministic locale: the popup resolves "system" from the browser
+  // locale (French if the browser is French, English otherwise), and the
+  // suite asserts English strings, so pin the locale here
+  try {
+    Object.defineProperty(navigator, 'language',
+                         { value: 'en-US', configurable: true });
+    Object.defineProperty(navigator, 'languages',
+                         { value: ['en-US'], configurable: true });
+  } catch (e) {}
   // Loading the page with ?e2e-seed=<json> starts storage with legacy
   // vouchers (Marionette scripts run sandboxed and cannot reach page
   // globals, so the seed is passed through the URL instead)
@@ -272,7 +281,8 @@ SHIM = """
   var syncStore = {};
   var localArea = makeArea('local', localStore, [
     ['data-e2e-store', function(){ return localStore.vouchers || []; }],
-    ['data-e2e-device', function(){ return localStore.deviceId || ''; }]
+    ['data-e2e-device', function(){ return localStore.deviceId || ''; }],
+    ['data-e2e-settings', function(){ return localStore.settings || {}; }]
   ]);
   var syncArea = makeArea('sync', syncStore, [
     ['data-e2e-sync-store', function(){ return syncStore; }]
@@ -312,6 +322,7 @@ SHIM = """
   root.setAttribute('data-e2e-store', JSON.stringify(seed));
   root.setAttribute('data-e2e-sync-store', '{}');
   root.setAttribute('data-e2e-device', '');
+  root.setAttribute('data-e2e-settings', '{}');
   root.setAttribute('data-e2e-alerts', JSON.stringify(alerts));
   root.setAttribute('data-e2e-confirms', JSON.stringify(confirms));
   root.setAttribute('data-e2e-badge', '');
@@ -366,6 +377,7 @@ def pstate(s):
         " status: (function(){ var s = document.getElementById('statusMessage');"
         "          return { hidden: s.hidden, text: s.textContent }; })(),"
         " store: JSON.parse(document.documentElement.getAttribute('data-e2e-store') || '[]'),"
+        " settings: JSON.parse(document.documentElement.getAttribute('data-e2e-settings') || '{}'),"
         " syncStore: JSON.parse(document.documentElement.getAttribute('data-e2e-sync-store') || '{}'),"
         " badge: document.documentElement.getAttribute('data-e2e-badge') || '',"
         " deviceId: (function(){ var v = document.documentElement.getAttribute('data-e2e-device') || '';"
@@ -810,6 +822,107 @@ def popup_tests(s):
               (store_codes, st["status"], st["syncStore"]))
         check("popup: remove-expired hides itself when nothing is expired",
               btn["hidden"] is True, btn)
+
+        # ---- menu: Settings / Help / About views ----
+        def view_state():
+            return json.loads(s.page_js(
+                "function h(i){return document.getElementById(i).hidden;}"
+                "var ts = document.getElementById('themeSelect').value,"
+                "    ls = document.getElementById('languageSelect').value,"
+                "    nt = document.getElementById('notificationsToggle').checked;"
+                "return JSON.stringify({main: h('view-main'),"
+                " settings: h('view-settings'), help: h('view-help'), about: h('view-about'),"
+                " theme: ts, lang: ls, notif: nt});"))
+
+        s.client.navigate(url)
+        time.sleep(1)
+
+        s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
+        time.sleep(0.3)
+        menu = json.loads(s.page_js(
+            "var m = document.getElementById('menuPanel');"
+            "return JSON.stringify({hidden: m.hidden,"
+            " entries: Array.from(m.querySelectorAll('button')).map(function(b)"
+            "  {return b.textContent;})});"))
+        check("menu: hamburger opens a menu with Settings/Help/About",
+              menu["hidden"] is False
+              and menu["entries"] == ["Settings", "Help", "About"], menu)
+
+        s.page_js("document.getElementById('menuSettings').click(); return 'ok';")
+        time.sleep(0.3)
+        vs = view_state()
+        check("menu: Settings view opens with system defaults",
+              vs["main"] is True and vs["settings"] is False and vs["help"] is True
+              and vs["about"] is True and vs["theme"] == "system"
+              and vs["lang"] == "system" and vs["notif"] is True, vs)
+
+        s.page_js("var s = document.getElementById('themeSelect'); s.value = 'dark';"
+                  "s.dispatchEvent(new Event('change')); return 'ok';")
+        time.sleep(0.3)
+        st = pstate(s)
+        theme = s.page_js("return document.documentElement.getAttribute('data-theme');")
+        check("menu: dark theme applies immediately and persists",
+              theme == "dark" and st["settings"].get("theme") == "dark",
+              (theme, st["settings"]))
+
+        s.page_js("document.getElementById('notificationsToggle').click(); return 'ok';")
+        time.sleep(0.2)
+        st = pstate(s)
+        check("menu: notifications toggle persists off",
+              st["settings"].get("notifications") is False, st["settings"])
+
+        s.page_js("document.querySelector('#view-settings .back-btn').click(); return 'ok';")
+        s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
+        s.page_js("document.getElementById('menuAbout').click(); return 'ok';")
+        time.sleep(0.3)
+        about = json.loads(s.page_js(
+            "var c = document.getElementById('aboutContent');"
+            "return JSON.stringify({"
+            " name: c.querySelector('.about-name').textContent,"
+            " version: c.querySelector('.about-version').textContent,"
+            " links: Array.from(c.querySelectorAll('a')).map(function(a)"
+            "  {return [a.className, a.href];})});"))
+        # no browser.runtime in the test page, so the version stays empty
+        check("menu: About shows wagonBar and the EU donation links",
+              about["name"] == "wagonBar" and about["version"] == ""
+              and about["links"] == [["donate-liberapay", "https://liberapay.com/"],
+                                    ["donate-tipeee", "https://www.tipeee.com/"]],
+              about)
+
+        s.page_js("document.querySelector('#view-about .back-btn').click(); return 'ok';")
+        s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
+        s.page_js("document.getElementById('menuHelp').click(); return 'ok';")
+        time.sleep(0.3)
+        headings = json.loads(s.page_js(
+            "return JSON.stringify(Array.from(document.querySelectorAll('#helpContent h2'))"
+            ".map(function(h){return h.textContent;}));"))
+        check("menu: Help lists the usage sections",
+              headings == ["Adding a voucher", "Managing vouchers",
+                           "Sync across devices", "Privacy"], headings)
+
+        # language switch to French, from the Settings view
+        s.page_js("document.querySelector('#view-help .back-btn').click(); return 'ok';")
+        s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
+        s.page_js("document.getElementById('menuSettings').click(); return 'ok';")
+        s.page_js("var s = document.getElementById('languageSelect'); s.value = 'fr';"
+                  "s.dispatchEvent(new Event('change')); return 'ok';")
+        time.sleep(0.3)
+        st = pstate(s)
+        check("menu: French language persists to settings",
+              st["settings"].get("language") == "fr", st["settings"])
+
+        s.page_js("document.querySelector('#view-settings .back-btn').click(); return 'ok';")
+        time.sleep(0.3)
+        fr = json.loads(s.page_js(
+            "return JSON.stringify({"
+            " h1: document.querySelector('#view-main h1').textContent,"
+            " empty: document.getElementById('voucherList').innerText.trim(),"
+            " removeExpired: (function(){ var b = document.getElementById('removeExpiredBtn');"
+            "  return {hidden: b.hidden, text: b.textContent}; })()});"))
+        check("menu: French switches the main view strings",
+              fr["h1"] == "wagonBar \u2014 Bons SNCF"
+              and fr["empty"] == "Aucun bon pour l\u2019instant. Ajoutez-en un ci-dessus !"
+              and fr["removeExpired"]["hidden"] is True, fr)
 
         # ---- cross-device sync (the whole stack runs in the test page:
         # popup.js pushes user actions to the sync area, background sync

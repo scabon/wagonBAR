@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,24 +7,36 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="container">
-    <h1>wagonBar — SNCF Vouchers</h1>
+  <div class="container" id="view-main">
+    <div class="popup-header">
+      <h1 data-i18n="appTitle">wagonBar — SNCF Vouchers</h1>
+      <button type="button" id="menuBtn" class="menu-btn" aria-haspopup="menu" data-i18n-title="menuBtn" title="Menu">
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M2 4h12M2 8h12M2 12h12"></path>
+        </svg>
+      </button>
+      <div id="menuPanel" class="menu-panel" hidden>
+        <button type="button" id="menuSettings" data-i18n="menuSettings">Settings</button>
+        <button type="button" id="menuHelp" data-i18n="menuHelp">Help</button>
+        <button type="button" id="menuAbout" data-i18n="menuAbout">About</button>
+      </div>
+    </div>
 
     <div class="section">
-      <h2>Add New Voucher</h2>
+      <h2 data-i18n="addVoucherTitle">Add New Voucher</h2>
       <form id="addVoucherForm">
         <div class="form-group">
-          <label for="voucherCode">Code:</label>
-          <input type="text" id="voucherCode" placeholder="e.g., ABC123XYZ" required>
+          <label for="voucherCode" data-i18n="codeLabel">Code:</label>
+          <input type="text" id="voucherCode" data-i18n-placeholder="codePlaceholder" placeholder="e.g., ABC123XYZ" required>
         </div>
         <div class="form-group">
-          <label for="expiryDate">Expiration Date:</label>
+          <label for="expiryDate" data-i18n="expiryLabel">Expiration Date:</label>
           <div class="date-row">
             <div class="date-input-wrap">
               <span id="expiryGhost" class="input-ghost" aria-hidden="true"></span>
               <input type="text" id="expiryDate" placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" required>
             </div>
-            <button type="button" id="calendarToggle" class="calendar-btn" aria-label="Pick a date from the calendar" title="Pick a date">
+            <button type="button" id="calendarToggle" class="calendar-btn" data-i18n-label="calendarAria" aria-label="Pick a date from the calendar" data-i18n-title="calendarTitle" title="Pick a date">
               <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                 <rect x="1.5" y="3" width="13" height="11.5" rx="1.5"></rect>
                 <path d="M1.5 6.5h13M4.5 1v3M11.5 1v3"></path>
@@ -34,35 +46,83 @@
           <div id="calendarPanel" class="calendar-panel" hidden></div>
         </div>
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary" id="submitBtn">Add Voucher</button>
-          <button type="button" id="cancelEditBtn" class="btn btn-secondary" hidden>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submitBtn" data-i18n="addVoucher">Add Voucher</button>
+          <button type="button" id="cancelEditBtn" class="btn btn-secondary" data-i18n="cancel" hidden>Cancel</button>
         </div>
       </form>
       <div class="status-slot">
-        <div id="statusMessage" class="status-message" title="Click to dismiss" hidden></div>
+        <div id="statusMessage" class="status-message" data-i18n-title="dismissHint" title="Click to dismiss" hidden></div>
       </div>
     </div>
 
     <div class="section">
       <div class="list-header">
-        <h2>Your Vouchers</h2>
+        <h2 data-i18n="yourVouchers">Your Vouchers</h2>
         <div class="list-controls">
-          <button type="button" id="removeExpiredBtn" class="btn btn-danger remove-expired-btn" hidden>Remove expired</button>
-          <select id="sortOrder" title="Sort order">
-            <option value="date">By date</option>
-            <option value="code">By code</option>
+          <button type="button" id="removeExpiredBtn" class="btn btn-danger remove-expired-btn" data-i18n="removeExpired" hidden>Remove expired</button>
+          <select id="sortOrder" data-i18n-title="sortOrder" title="Sort order">
+            <option value="date" data-i18n="sortByDate">By date</option>
+            <option value="code" data-i18n="sortByCode">By code</option>
           </select>
         </div>
       </div>
       <div id="voucherList" class="voucher-list">
-        <p class="empty-message">No vouchers yet. Add one above!</p>
+        <p class="empty-message" data-i18n="emptyMessage">No vouchers yet. Add one above!</p>
       </div>
     </div>
 
     <div class="section stats">
-      <p>Total: <span id="totalVouchers">0</span> vouchers</p>
-      <p>Valid: <span id="validVouchers">0</span> vouchers</p>
+      <p><span data-i18n="statsTotal">Total</span>: <span id="totalVouchers">0</span> <span data-i18n="statsVouchers">vouchers</span></p>
+      <p><span data-i18n="statsValid">Valid</span>: <span id="validVouchers">0</span> <span data-i18n="statsVouchers">vouchers</span></p>
     </div>
+  </div>
+
+  <div class="container" id="view-settings" hidden>
+    <div class="back-row">
+      <button type="button" class="back-btn" data-back data-i18n-title="back" title="Back">&#8592;</button>
+      <h1 data-i18n="menuSettings">Settings</h1>
+    </div>
+    <div class="section">
+      <div class="form-group">
+        <label for="themeSelect" data-i18n="settingsTheme">Theme</label>
+        <select id="themeSelect">
+          <option value="system" data-i18n="themeSystem">System</option>
+          <option value="light" data-i18n="themeLight">Light</option>
+          <option value="dark" data-i18n="themeDark">Dark</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="languageSelect" data-i18n="settingsLanguage">Language</label>
+        <select id="languageSelect">
+          <option value="system" data-i18n="langSystem">System</option>
+          <option value="en">English</option>
+          <option value="fr">Fran&ccedil;ais</option>
+        </select>
+      </div>
+      <div class="form-group checkbox-row">
+        <label>
+          <input type="checkbox" id="notificationsToggle" checked>
+          <span data-i18n="settingsNotifications">SNCF site notification</span>
+        </label>
+        <p class="setting-hint" data-i18n="settingsNotificationsHint">Show a reminder when you open sncf-connect.com with valid vouchers</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" id="view-help" hidden>
+    <div class="back-row">
+      <button type="button" class="back-btn" data-back data-i18n-title="back" title="Back">&#8592;</button>
+      <h1 data-i18n="menuHelp">Help</h1>
+    </div>
+    <div class="section help-text" id="helpContent"></div>
+  </div>
+
+  <div class="container" id="view-about" hidden>
+    <div class="back-row">
+      <button type="button" class="back-btn" data-back data-i18n-title="back" title="Back">&#8592;</button>
+      <h1 data-i18n="menuAbout">About</h1>
+    </div>
+    <div class="section help-text" id="aboutContent"></div>
   </div>
 
   <script src="../vendor/browser-polyfill.js"></script>

@@ -1,4 +1,4 @@
-// Popup script for SNCF Voucher Reminder extension
+// Popup script for the wagonBar extension
 
 document.addEventListener('DOMContentLoaded', function() {
   const addVoucherForm = document.getElementById('addVoucherForm');
@@ -10,6 +10,13 @@ document.addEventListener('DOMContentLoaded', function() {
   const cancelEditBtn = document.getElementById('cancelEditBtn');
   const sortSelect = document.getElementById('sortOrder');
   const removeExpiredBtn = document.getElementById('removeExpiredBtn');
+  const menuBtn = document.getElementById('menuBtn');
+  const menuPanel = document.getElementById('menuPanel');
+  const themeSelect = document.getElementById('themeSelect');
+  const languageSelect = document.getElementById('languageSelect');
+  const notificationsToggle = document.getElementById('notificationsToggle');
+  const helpContent = document.getElementById('helpContent');
+  const aboutContent = document.getElementById('aboutContent');
 
   // Voucher currently being edited in the form, null when adding
   let editingId = null;
@@ -25,15 +32,372 @@ document.addEventListener('DOMContentLoaded', function() {
   // Date entry pattern shown as the grey hint while typing
   const DATE_PATTERN = 'YYYY-MM-DD';
 
+  // ---------------------------------------------------------------- i18n
+  // English is the fallback; "system" resolves to the browser locale
+  // (French when the browser is French, English otherwise)
+  const STRINGS = {
+    en: {
+      appTitle: 'wagonBar \u2014 SNCF Vouchers',
+      menuBtn: 'Menu',
+      menuSettings: 'Settings',
+      menuHelp: 'Help',
+      menuAbout: 'About',
+      addVoucherTitle: 'Add New Voucher',
+      codeLabel: 'Code:',
+      codePlaceholder: 'e.g., ABC123XYZ',
+      expiryLabel: 'Expiration Date:',
+      calendarAria: 'Pick a date from the calendar',
+      calendarTitle: 'Pick a date',
+      addVoucher: 'Add Voucher',
+      updateVoucher: 'Update Voucher',
+      cancel: 'Cancel',
+      dismissHint: 'Click to dismiss',
+      yourVouchers: 'Your Vouchers',
+      removeExpired: 'Remove expired',
+      confirmQuestion: 'Confirm?',
+      sortByDate: 'By date',
+      sortByCode: 'By code',
+      sortOrder: 'Sort order',
+      emptyMessage: 'No vouchers yet. Add one above!',
+      statsTotal: 'Total',
+      statsValid: 'Valid',
+      statsVouchers: 'vouchers',
+      settingsTheme: 'Theme',
+      themeSystem: 'System',
+      themeLight: 'Light',
+      themeDark: 'Dark',
+      settingsLanguage: 'Language',
+      langSystem: 'System',
+      settingsNotifications: 'SNCF site notification',
+      settingsNotificationsHint: 'Show a reminder when you open sncf-connect.com with valid vouchers',
+      errFillBoth: 'Please fill in both fields.',
+      errValidDate: 'Enter a valid expiration date (YYYY-MM-DD).',
+      errPastDate: 'The expiration date is in the past.',
+      errDuplicate: 'A voucher with this code already exists!',
+      statusUpdated: 'Voucher updated.',
+      warnCodeLength: '"{code}" does not look like a usual {n}-character voucher code. Double-check it.',
+      removedExpiredOne: 'Removed 1 expired voucher.',
+      removedExpiredMany: 'Removed {n} expired vouchers.',
+      edit: 'Edit',
+      del: 'Delete',
+      expiresPrefix: 'Expires: ',
+      prevMonth: 'Previous month',
+      nextMonth: 'Next month',
+      back: 'Back',
+      months: ['January', 'February', 'March', 'April', 'May', 'June',
+               'July', 'August', 'September', 'October', 'November', 'December'],
+      weekdays: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+      helpSections: [
+        { title: 'Adding a voucher',
+          text: 'Enter the voucher code and its expiration date, then press Add Voucher. The date format is YYYY-MM-DD; use the calendar button to pick a date.',
+          items: [] },
+        { title: 'Managing vouchers',
+          text: '',
+          items: ['Edit loads a voucher back into the form.',
+                  'Delete is a two-step action: press it once, then Confirm.',
+                  'Remove expired clears every expired voucher at once.'] },
+        { title: 'Sync across devices',
+          text: 'Vouchers replicate through your browser account (Firefox account on Firefox, Google/Microsoft account on Chromium) once the browser is signed in. Safari keeps everything local.',
+          items: [] },
+        { title: 'Privacy',
+          text: 'wagonBar stores everything locally in your browser. It requests no network access and sends nothing anywhere.',
+          items: [] }
+      ],
+      aboutTagline: 'A small reminder for your SNCF Connect vouchers.',
+      aboutNote: 'Not affiliated with SNCF. Your vouchers stay in your own browser.',
+      donateTitle: 'Support wagonBar',
+      donateLiberapay: 'Donate on Liberapay',
+      donateTipeee: 'Tip on Tipeee'
+    },
+    fr: {
+      appTitle: 'wagonBar \u2014 Bons SNCF',
+      menuBtn: 'Menu',
+      menuSettings: 'Param\u00e8tres',
+      menuHelp: 'Aide',
+      menuAbout: '\u00c0 propos',
+      addVoucherTitle: 'Ajouter un bon',
+      codeLabel: 'Code :',
+      codePlaceholder: 'ex. ABC123XYZ',
+      expiryLabel: 'Date d\u2019expiration :',
+      calendarAria: 'Choisir une date dans le calendrier',
+      calendarTitle: 'Choisir une date',
+      addVoucher: 'Ajouter',
+      updateVoucher: 'Mettre \u00e0 jour',
+      cancel: 'Annuler',
+      dismissHint: 'Cliquer pour fermer',
+      yourVouchers: 'Vos bons',
+      removeExpired: 'Supprimer expir\u00e9s',
+      confirmQuestion: 'Confirmer ?',
+      sortByDate: 'Par date',
+      sortByCode: 'Par code',
+      sortOrder: 'Ordre de tri',
+      emptyMessage: 'Aucun bon pour l\u2019instant. Ajoutez-en un ci-dessus !',
+      statsTotal: 'Total',
+      statsValid: 'Valides',
+      statsVouchers: 'bons',
+      settingsTheme: 'Th\u00e8me',
+      themeSystem: 'Syst\u00e8me',
+      themeLight: 'Clair',
+      themeDark: 'Sombre',
+      settingsLanguage: 'Langue',
+      langSystem: 'Syst\u00e8me',
+      settingsNotifications: 'Notification sur le site SNCF',
+      settingsNotificationsHint: 'Affiche un rappel quand vous ouvrez sncf-connect.com avec des bons valides',
+      errFillBoth: 'Veuillez remplir les deux champs.',
+      errValidDate: 'Saisissez une date d\u2019expiration valide (AAAA-MM-JJ).',
+      errPastDate: 'La date d\u2019expiration est dans le pass\u00e9.',
+      errDuplicate: 'Un bon avec ce code existe d\u00e9j\u00e0 !',
+      statusUpdated: 'Bon mis \u00e0 jour.',
+      warnCodeLength: '\u00ab {code} \u00bb ne ressemble pas \u00e0 un code de bon habituel de {n} caract\u00e8res. V\u00e9rifiez-le.',
+      removedExpiredOne: '1 bon expir\u00e9 supprim\u00e9.',
+      removedExpiredMany: '{n} bons expir\u00e9s supprim\u00e9s.',
+      edit: 'Modifier',
+      del: 'Supprimer',
+      expiresPrefix: 'Expire : ',
+      prevMonth: 'Mois pr\u00e9c\u00e9dent',
+      nextMonth: 'Mois suivant',
+      back: 'Retour',
+      months: ['janvier', 'f\u00e9vrier', 'mars', 'avril', 'mai', 'juin',
+               'juillet', 'ao\u00fbt', 'septembre', 'octobre', 'novembre', 'd\u00e9cembre'],
+      weekdays: ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'],
+      helpSections: [
+        { title: 'Ajouter un bon',
+          text: 'Saisissez le code du bon et sa date d\u2019expiration, puis appuyez sur Ajouter. Le format de date est AAAA-MM-JJ ; utilisez le bouton calendrier pour choisir une date.',
+          items: [] },
+        { title: 'G\u00e9rer les bons',
+          text: '',
+          items: ['Modifier recharge un bon dans le formulaire.',
+                  'Supprimer se fait en deux temps : un premier appui, puis Confirmer.',
+                  'Supprimer expir\u00e9s efface d\u2019un coup tous les bons expir\u00e9s.'] },
+        { title: 'Synchronisation entre appareils',
+          text: 'Les bons se r\u00e9pliquent via le compte du navigateur (compte Firefox sur Firefox, compte Google/Microsoft sur Chromium) quand le navigateur est connect\u00e9. Safari reste local.',
+          items: [] },
+        { title: 'Confidentialit\u00e9',
+          text: 'wagonBar stocke tout localement dans votre navigateur. Il n\u2019acc\u00e8de \u00e0 aucun r\u00e9seau et n\u2019envoie rien nulle part.',
+          items: [] }
+      ],
+      aboutTagline: 'Un petit rappel pour vos bons SNCF Connect.',
+      aboutNote: 'Non affili\u00e9 \u00e0 la SNCF. Vos bons restent dans votre navigateur.',
+      donateTitle: 'Soutenir wagonBar',
+      donateLiberapay: 'Soutenir sur Liberapay',
+      donateTipeee: 'Pourboire sur Tipeee'
+    }
+  };
+
+  // Donation links. TODO: append the handle to each URL once the
+  // Liberapay/Tipeee accounts exist (see AGENTS.md, Donations section)
+  const DONATION_LIBERAPAY = 'https://liberapay.com/';
+  const DONATION_TIPEEE = 'https://www.tipeee.com/';
+
+  let currentLang = 'en';
+
+  function t(key, params) {
+    let s = (STRINGS[currentLang] && STRINGS[currentLang][key]) ||
+             STRINGS.en[key];
+    if (s === undefined) return key;
+    if (params) {
+      Object.keys(params).forEach(function(name) {
+        s = s.split('{' + name + '}').join(params[name]);
+      });
+    }
+    return s;
+  }
+
+  // Apply the current language to every tagged node in the static markup
+  function applyI18n() {
+    document.documentElement.lang = currentLang === 'fr' ? 'fr' : 'en';
+    document.querySelectorAll('[data-i18n]').forEach(function(node) {
+      node.textContent = t(node.dataset.i18n);
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(function(node) {
+      node.placeholder = t(node.dataset.i18nPlaceholder);
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(function(node) {
+      node.title = t(node.dataset.i18nTitle);
+    });
+    document.querySelectorAll('[data-i18n-label]').forEach(function(node) {
+      node.setAttribute('aria-label', t(node.dataset.i18nLabel));
+    });
+  }
+
+  // ------------------------------------------------------------- settings
+  const DEFAULT_SETTINGS = {
+    theme: 'system',      // 'system' | 'light' | 'dark'
+    language: 'system',   // 'system' | 'en' | 'fr'
+    notifications: true
+  };
+  let settings = Object.assign({}, DEFAULT_SETTINGS);
+
+  const darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+  if (darkMedia && darkMedia.addEventListener) {
+    darkMedia.addEventListener('change', function() {
+      if (settings.theme === 'system') applyTheme();
+    });
+  }
+
+  // The CSS only ever sees "light" or "dark": "system" is resolved here
+  function applyTheme() {
+    const resolved = settings.theme === 'system'
+        ? (darkMedia && darkMedia.matches ? 'dark' : 'light')
+        : settings.theme;
+    document.documentElement.setAttribute('data-theme', resolved);
+  }
+
+  function applyLanguage() {
+    currentLang = resolveLanguage(settings.language);
+    applyI18n();
+    buildHelpContent();
+    buildAboutContent();
+    // Dynamic labels and any rendered vouchers must follow the language
+    submitBtn.textContent = editingId ? t('updateVoucher') : t('addVoucher');
+    loadVouchers();
+  }
+
+  function resolveLanguage(setting) {
+    if (setting === 'en' || setting === 'fr') return setting;
+    return ((navigator.language || 'en').toLowerCase().indexOf('fr') === 0)
+        ? 'fr' : 'en';
+  }
+
+  function loadSettings() {
+    browser.storage.local.get('settings').then(function(data) {
+      settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
+      themeSelect.value = settings.theme;
+      languageSelect.value = settings.language;
+      notificationsToggle.checked = settings.notifications;
+      applyTheme();
+      applyLanguage();
+    });
+  }
+
+  function saveSettings() {
+    browser.storage.local.set({ settings: settings });
+  }
+
+  themeSelect.addEventListener('change', function() {
+    settings.theme = themeSelect.value;
+    applyTheme();
+    saveSettings();
+  });
+
+  languageSelect.addEventListener('change', function() {
+    settings.language = languageSelect.value;
+    applyLanguage();
+    saveSettings();
+  });
+
+  notificationsToggle.addEventListener('change', function() {
+    settings.notifications = notificationsToggle.checked;
+    saveSettings();
+  });
+
+  // ---------------------------------------------------------------- views
+  const VIEWS = ['view-main', 'view-settings', 'view-help', 'view-about'];
+
+  function showView(id) {
+    VIEWS.forEach(function(view) {
+      document.getElementById(view).hidden = (view !== id);
+    });
+  }
+
+  function openMenu() {
+    menuPanel.hidden = false;
+    menuBtn.classList.add('open');
+  }
+
+  function closeMenu() {
+    menuPanel.hidden = true;
+    menuBtn.classList.remove('open');
+  }
+
+  menuBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (menuPanel.hidden) openMenu();
+    else closeMenu();
+  });
+
+  menuPanel.addEventListener('click', function(e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    closeMenu();
+    showView('view-' + btn.id.replace('menu', '').toLowerCase());
+  });
+
+  document.querySelectorAll('[data-back]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      showView('view-main');
+    });
+  });
+
+  // -------------------------------------------------------------- content
+  function buildHelpContent() {
+    const frag = document.createDocumentFragment();
+    t('helpSections').forEach(function(section) {
+      const h = document.createElement('h2');
+      h.textContent = section.title;
+      frag.appendChild(h);
+      if (section.text) {
+        const p = document.createElement('p');
+        p.textContent = section.text;
+        frag.appendChild(p);
+      }
+      if (section.items && section.items.length) {
+        const ul = document.createElement('ul');
+        section.items.forEach(function(item) {
+          const li = document.createElement('li');
+          li.textContent = item;
+          ul.appendChild(li);
+        });
+        frag.appendChild(ul);
+      }
+    });
+    helpContent.replaceChildren(frag);
+  }
+
+  function buildAboutContent() {
+    const name = buildNode('p', 'about-name', 'wagonBar');
+    let version = '';
+    try {
+      if (browser.runtime && browser.runtime.getManifest) {
+        version = browser.runtime.getManifest().version;
+      }
+    } catch (e) {
+      // not running as a real extension (e.g. the e2e test page)
+    }
+    const versionNode = buildNode('p', 'about-version',
+                                  version ? 'Version ' + version : '');
+    const tagline = buildNode('p', '', t('aboutTagline'));
+    const note = buildNode('p', 'about-note', t('aboutNote'));
+
+    const donateTitle = buildNode('h2', '', t('donateTitle'));
+    const liberapay = document.createElement('a');
+    liberapay.href = DONATION_LIBERAPAY;
+    liberapay.target = '_blank';
+    liberapay.rel = 'noopener noreferrer';
+    liberapay.className = 'donate-liberapay';
+    liberapay.textContent = t('donateLiberapay');
+    const tipeee = document.createElement('a');
+    tipeee.href = DONATION_TIPEEE;
+    tipeee.target = '_blank';
+    tipeee.rel = 'noopener noreferrer';
+    tipeee.className = 'donate-tipeee';
+    tipeee.textContent = t('donateTipeee');
+    const donateRow = buildNode('div', 'donate-row');
+    donateRow.appendChild(liberapay);
+    donateRow.appendChild(tipeee);
+
+    aboutContent.replaceChildren(name, versionNode, tagline, note,
+                                 donateTitle, donateRow);
+  }
+
   // Firefox cannot open its native date picker inside an extension popup,
   // so the date is a text field with this custom calendar widget
-  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
-                  'July', 'August', 'September', 'October', 'November', 'December'];
-  const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
   let viewYear = new Date().getFullYear();
   let viewMonth = new Date().getMonth();
 
-  // Load and display vouchers
+  // Load settings, vouchers and display
+  applyTheme();
+  loadSettings();
   loadVouchers();
   updateGhost();
 
@@ -122,13 +486,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const rawDate = expiryInput.value.trim();
 
     if (!code || !rawDate) {
-      showStatus('Please fill in both fields.', 'error');
+      showStatus(t('errFillBoth'), 'error');
       return;
     }
 
     const expiryDate = parseDateInput(rawDate);
     if (!expiryDate) {
-      showStatus('Enter a valid expiration date (YYYY-MM-DD).', 'error');
+      showStatus(t('errValidDate'), 'error');
       return;
     }
 
@@ -136,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const now = new Date();
     const today = toISO(now.getFullYear(), now.getMonth() + 1, now.getDate());
     if (expiryDate < today) {
-      showStatus('The expiration date is in the past.', 'error');
+      showStatus(t('errPastDate'), 'error');
       return;
     }
 
@@ -147,7 +511,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update the edited voucher (its own code doesn't count as duplicate)
         const duplicate = vouchers.some(v => v.code === code && v.id !== editingId);
         if (duplicate) {
-          showStatus('A voucher with this code already exists!', 'error');
+          showStatus(t('errDuplicate'), 'error');
           return;
         }
         const edited = vouchers.find(v => v.id === editingId);
@@ -161,7 +525,7 @@ document.addEventListener('DOMContentLoaded', function() {
         browser.storage.local.set({ vouchers: vouchers }).then(function() {
           cancelEdit();
           loadVouchers();
-          showStatus('Voucher updated.', 'success');
+          showStatus(t('statusUpdated'), 'success');
           syncWriteVoucher(edited);
         });
         return;
@@ -172,7 +536,7 @@ document.addEventListener('DOMContentLoaded', function() {
       // Check for duplicate
       const exists = vouchers.some(v => v.code === code);
       if (exists) {
-        showStatus('A voucher with this code already exists!', 'error');
+        showStatus(t('errDuplicate'), 'error');
         return;
       }
 
@@ -205,9 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const code = this.value.trim().toUpperCase();
     if (code && code.length !== EXPECTED_CODE_LENGTH) {
       const shown = code.length > 12 ? code.slice(0, 12) + '\u2026' : code;
-      showStatus('"' + shown + '" does not look like a usual ' +
-                  EXPECTED_CODE_LENGTH + '-character voucher code. ' +
-                  'Double-check it.', 'warning');
+      showStatus(t('warnCodeLength', { code: shown, n: EXPECTED_CODE_LENGTH }), 'warning');
     } else {
       clearStatus();
     }
@@ -222,7 +584,7 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('voucherCode').value = voucher.code;
       expiryInput.value = voucher.expiryDate;
       updateGhost();
-      submitBtn.textContent = 'Update Voucher';
+      submitBtn.textContent = t('updateVoucher');
       cancelEditBtn.hidden = false;
       document.getElementById('voucherCode').focus();
     });
@@ -232,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
     editingId = null;
     addVoucherForm.reset();
     updateGhost();
-    submitBtn.textContent = 'Add Voucher';
+    submitBtn.textContent = t('addVoucher');
     cancelEditBtn.hidden = true;
     clearStatus();
   }
@@ -274,17 +636,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const nextBtn = buildNode('button', 'calendar-nav', '\u203A');
     prevBtn.type = 'button';
     nextBtn.type = 'button';
-    prevBtn.title = 'Previous month';
-    nextBtn.title = 'Next month';
+    prevBtn.title = t('prevMonth');
+    nextBtn.title = t('nextMonth');
     const title = buildNode('span', 'calendar-title',
-                            MONTHS[viewMonth] + ' ' + viewYear);
+                            t('months')[viewMonth] + ' ' + viewYear);
     header.appendChild(prevBtn);
     header.appendChild(title);
     header.appendChild(nextBtn);
     calendarPanel.appendChild(header);
 
     const grid = buildNode('div', 'calendar-grid');
-    WEEKDAYS.forEach(function(weekday) {
+    t('weekdays').forEach(function(weekday) {
       grid.appendChild(buildNode('span', 'calendar-weekday', weekday));
     });
 
@@ -359,16 +721,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Close when clicking elsewhere in the popup or pressing Escape
+  // Close the calendar and the menu when clicking elsewhere in the popup
+  // or pressing Escape
   document.addEventListener('click', function(e) {
     if (!calendarPanel.hidden && !calendarPanel.contains(e.target) &&
         !calendarBtn.contains(e.target)) {
       closeCalendar();
     }
+    if (!menuPanel.hidden && !menuPanel.contains(e.target) &&
+        !menuBtn.contains(e.target)) {
+      closeMenu();
+    }
   });
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       closeCalendar();
+      closeMenu();
     }
   });
 
@@ -382,7 +750,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (sorted.length === 0) {
-      voucherList.replaceChildren(buildNode('p', 'empty-message', 'No vouchers yet. Add one above!'));
+      voucherList.replaceChildren(buildNode('p', 'empty-message', t('emptyMessage')));
       totalVouchersSpan.textContent = '0';
       validVouchersSpan.textContent = '0';
       removeExpiredBtn.hidden = true;
@@ -408,12 +776,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
       const info = buildNode('div');
       info.appendChild(buildNode('div', 'code', voucher.code));
-      info.appendChild(buildNode('div', 'expiry', 'Expires: ' + formatDate(expiryDate)));
+      info.appendChild(buildNode('div', 'expiry', t('expiresPrefix') + formatDate(expiryDate)));
 
-      const editBtn = buildNode('button', 'btn btn-secondary edit-btn', 'Edit');
+      const editBtn = buildNode('button', 'btn btn-secondary edit-btn', t('edit'));
       editBtn.dataset.id = voucher.id;
 
-      const deleteBtn = buildNode('button', 'btn btn-danger delete-btn', 'Delete');
+      const deleteBtn = buildNode('button', 'btn btn-danger delete-btn', t('del'));
       deleteBtn.dataset.id = voucher.id;
 
       const actions = buildNode('div', 'actions');
@@ -448,13 +816,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     voucherList.querySelectorAll('.delete-btn.confirm').forEach(resetDeleteBtn);
     btn.classList.add('confirm');
-    btn.textContent = 'Confirm?';
+    btn.textContent = t('confirmQuestion');
     setTimeout(function() { resetDeleteBtn(btn); }, 4000);
   });
 
   function resetDeleteBtn(btn) {
     btn.classList.remove('confirm');
-    btn.textContent = 'Delete';
+    btn.textContent = t('del');
   }
 
   // Delete a voucher
@@ -479,13 +847,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     removeExpiredBtn.classList.add('confirm');
-    removeExpiredBtn.textContent = 'Confirm?';
+    removeExpiredBtn.textContent = t('confirmQuestion');
     setTimeout(function() { resetRemoveExpiredBtn(); }, 4000);
   });
 
   function resetRemoveExpiredBtn() {
     removeExpiredBtn.classList.remove('confirm');
-    removeExpiredBtn.textContent = 'Remove expired';
+    removeExpiredBtn.textContent = t('removeExpired');
   }
 
   // Delete every expired voucher; each deletion is mirrored to the sync
@@ -505,8 +873,9 @@ document.addEventListener('DOMContentLoaded', function() {
       browser.storage.local.set({ vouchers: updatedVouchers }).then(function() {
         if (editingId && expiredIds[editingId]) cancelEdit();
         loadVouchers();
-        showStatus('Removed ' + expired.length + ' expired voucher' +
-                   (expired.length > 1 ? 's' : '') + '.', 'success');
+        showStatus(expired.length === 1 ? t('removedExpiredOne')
+                                        : t('removedExpiredMany', { n: expired.length }),
+                   'success');
         expired.forEach(function(v) { syncWriteVoucher({ id: v.id }, true); });
       });
     });
