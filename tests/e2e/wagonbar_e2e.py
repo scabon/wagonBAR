@@ -885,8 +885,8 @@ def popup_tests(s):
         # no browser.runtime in the test page, so the version stays empty
         check("menu: About shows wagonBar and the EU donation links",
               about["name"] == "wagonBar" and about["version"] == ""
-              and about["links"] == [["donate-liberapay", "https://liberapay.com/"],
-                                    ["donate-tipeee", "https://www.tipeee.com/"]],
+              and about["links"] == [["donate-liberapay", "https://liberapay.com/cabon14/"],
+                                    ["donate-tipeee", "https://fr.tipeee.com/cabon14/"]],
               about)
 
         s.page_js("document.querySelector('#view-about .back-btn').click(); return 'ok';")

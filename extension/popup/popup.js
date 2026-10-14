@@ -184,10 +184,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   };
 
-  // Donation links. TODO: append the handle to each URL once the
-  // Liberapay/Tipeee accounts exist (see AGENTS.md, Donations section)
-  const DONATION_LIBERAPAY = 'https://liberapay.com/';
-  const DONATION_TIPEEE = 'https://www.tipeee.com/';
+  // Donation links (see AGENTS.md, Donations section)
+  const DONATION_LIBERAPAY = 'https://liberapay.com/cabon14/';
+  const DONATION_TIPEEE = 'https://fr.tipeee.com/cabon14/';
 
   let currentLang = 'en';
 
