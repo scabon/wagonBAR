@@ -46,10 +46,13 @@
     <div class="section">
       <div class="list-header">
         <h2>Your Vouchers</h2>
-        <select id="sortOrder" title="Sort order">
-          <option value="date">By date</option>
-          <option value="code">By code</option>
-        </select>
+        <div class="list-controls">
+          <button type="button" id="removeExpiredBtn" class="btn btn-danger remove-expired-btn" hidden>Remove expired</button>
+          <select id="sortOrder" title="Sort order">
+            <option value="date">By date</option>
+            <option value="code">By code</option>
+          </select>
+        </div>
       </div>
       <div id="voucherList" class="voucher-list">
         <p class="empty-message">No vouchers yet. Add one above!</p>

@@ -759,6 +759,58 @@ def popup_tests(s):
               and ("Expires: " + today_d) in st["items"][0]["text"],
               (st["total"], st["valid"], st["items"]))
 
+        # ---- remove expired: bulk-clear button with the same two-step
+        # confirm as the single delete ----
+        def remove_expired_btn():
+            return json.loads(s.page_js(
+                "var b = document.getElementById('removeExpiredBtn');"
+                "return JSON.stringify({hidden: b.hidden, text: b.textContent});"))
+
+        s.client.navigate(url + "?e2e-seed=" + quote(json.dumps([
+            {"id": "seed-rx-1", "code": "E2E-OLDEXP-1",
+             "expiryDate": "2020-01-01",
+             "createdAt": "2026-09-29T00:00:00.000Z"},
+            {"id": "seed-rx-2", "code": "E2E-OLDEXP-2",
+             "expiryDate": "2020-02-02",
+             "createdAt": "2026-09-29T00:00:00.000Z"},
+            {"id": "seed-rx-3", "code": "E2E-KEEPER-1",
+             "expiryDate": "2028-01-01",
+             "createdAt": "2026-09-29T00:00:00.000Z"}])))
+        time.sleep(1)
+        btn = remove_expired_btn()
+        st = pstate(s)
+        check("popup: remove-expired shown when an expired voucher exists",
+              btn["hidden"] is False and btn["text"] == "Remove expired",
+              (btn, st["total"], st["valid"]))
+
+        s.page_js("document.getElementById('removeExpiredBtn').click(); return 'ok';")
+        time.sleep(0.4)
+        btn = remove_expired_btn()
+        st = pstate(s)
+        check("popup: first remove-expired click arms confirm, nothing deleted",
+              btn["text"] == "Confirm?" and len(st["items"]) == 3
+              and len(st["store"]) == 3, (btn, st["store"]))
+
+        s.page_js("document.getElementById('removeExpiredBtn').click(); return 'ok';")
+        removed = False
+        for _ in range(20):
+            st = pstate(s)
+            if len(st["items"]) == 1:
+                removed = True
+                break
+            time.sleep(0.4)
+        store_codes = [v["code"] for v in st["store"]]
+        tombstones = {k for k, v in st["syncStore"].items() if v.get("deleted")}
+        btn = remove_expired_btn()
+        check("popup: remove-expired clears expired, keeps valid, writes tombstones",
+              removed and store_codes == ["E2E-KEEPER-1"]
+              and not st["status"]["hidden"]
+              and "Removed 2 expired vouchers" in st["status"]["text"]
+              and tombstones == {"voucher-seed-rx-1", "voucher-seed-rx-2"},
+              (store_codes, st["status"], st["syncStore"]))
+        check("popup: remove-expired hides itself when nothing is expired",
+              btn["hidden"] is True, btn)
+
         # ---- cross-device sync (the whole stack runs in the test page:
         # popup.js pushes user actions to the sync area, background sync
         # engine merges remote changes back into local storage) ----

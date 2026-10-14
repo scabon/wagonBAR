@@ -368,6 +368,18 @@ input[type="date"]:focus {
   cursor: pointer;
 }
 
+/* Remove-expired bulk action next to the sort control */
+.list-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remove-expired-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
 .status-message.error {
   background-color: #fdecea;
   color: #c0392b;

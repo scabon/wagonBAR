@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const submitBtn = document.getElementById('submitBtn');
   const cancelEditBtn = document.getElementById('cancelEditBtn');
   const sortSelect = document.getElementById('sortOrder');
+  const removeExpiredBtn = document.getElementById('removeExpiredBtn');
 
   // Voucher currently being edited in the form, null when adding
   let editingId = null;
@@ -384,6 +385,7 @@ document.addEventListener('DOMContentLoaded', function() {
       voucherList.replaceChildren(buildNode('p', 'empty-message', 'No vouchers yet. Add one above!'));
       totalVouchersSpan.textContent = '0';
       validVouchersSpan.textContent = '0';
+      removeExpiredBtn.hidden = true;
       return;
     }
 
@@ -391,6 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
     now.setHours(0, 0, 0, 0); // Normalize to start of day
 
     let validCount = 0;
+    let expiredCount = 0;
     const frag = document.createDocumentFragment();
 
     sorted.forEach(function(voucher) {
@@ -401,6 +404,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const isValid = expiryDate >= now;
 
       if (isValid) validCount++;
+      else expiredCount++;
 
       const info = buildNode('div');
       info.appendChild(buildNode('div', 'code', voucher.code));
@@ -425,6 +429,10 @@ document.addEventListener('DOMContentLoaded', function() {
     voucherList.replaceChildren(frag);
     totalVouchersSpan.textContent = vouchers.length;
     validVouchersSpan.textContent = validCount;
+
+    // The bulk-clear action only makes sense when an expired voucher exists
+    removeExpiredBtn.hidden = expiredCount === 0;
+    if (removeExpiredBtn.hidden) resetRemoveExpiredBtn();
   }
 
   // Delete is a two-step action: first click arms the button,
@@ -458,6 +466,48 @@ document.addEventListener('DOMContentLoaded', function() {
       browser.storage.local.set({ vouchers: updatedVouchers }).then(function() {
         loadVouchers();
         syncWriteVoucher({ id: id }, true);
+      });
+    });
+  }
+
+  // Remove expired uses the same two-step confirm as the single delete
+  removeExpiredBtn.addEventListener('click', function() {
+    if (removeExpiredBtn.classList.contains('confirm')) {
+      resetRemoveExpiredBtn();
+      removeExpiredVouchers();
+      return;
+    }
+
+    removeExpiredBtn.classList.add('confirm');
+    removeExpiredBtn.textContent = 'Confirm?';
+    setTimeout(function() { resetRemoveExpiredBtn(); }, 4000);
+  });
+
+  function resetRemoveExpiredBtn() {
+    removeExpiredBtn.classList.remove('confirm');
+    removeExpiredBtn.textContent = 'Remove expired';
+  }
+
+  // Delete every expired voucher; each deletion is mirrored to the sync
+  // area as a tombstone, exactly like a single delete
+  function removeExpiredVouchers() {
+    browser.storage.local.get('vouchers').then(function(data) {
+      const vouchers = data.vouchers || [];
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const expired = vouchers.filter(v => new Date(v.expiryDate + 'T00:00:00') < now);
+      if (expired.length === 0) return;
+
+      const expiredIds = {};
+      expired.forEach(function(v) { expiredIds[v.id] = true; });
+      const updatedVouchers = vouchers.filter(v => !expiredIds[v.id]);
+
+      browser.storage.local.set({ vouchers: updatedVouchers }).then(function() {
+        if (editingId && expiredIds[editingId]) cancelEdit();
+        loadVouchers();
+        showStatus('Removed ' + expired.length + ' expired voucher' +
+                   (expired.length > 1 ? 's' : '') + '.', 'success');
+        expired.forEach(function(v) { syncWriteVoucher({ id: v.id }, true); });
       });
     });
   }
