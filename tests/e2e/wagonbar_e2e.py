@@ -417,13 +417,16 @@ def pstate(s):
     ))
 
 
-def popup_add(s, code, date):
+def popup_add(s, code, date, value=None):
     s.page_js(
         "document.getElementById('voucherCode').value = %s;"
+        "document.getElementById('voucherValue').value = %s;"
         "document.getElementById('expiryDate').value = %s;"
         "document.getElementById('addVoucherForm').dispatchEvent("
         "  new Event('submit', {bubbles: true, cancelable: true}));"
-        "return 'ok';" % (json.dumps(code), json.dumps(date))
+        "return 'ok';" % (json.dumps(code),
+                          json.dumps("" if value is None else value),
+                          json.dumps(date))
     )
 
 
@@ -1025,6 +1028,51 @@ def popup_tests(s):
         st = pstate(s)
         check("notify: no notification when no voucher is valid",
               len(st["notifications"]) == 2, st["notifications"])
+
+        # ---- voucher value in euros (optional field) ----
+        s.client.navigate(url)
+        time.sleep(1)
+
+        popup_add(s, "E2E-VAL-1", "2026-11-11", "25")
+        time.sleep(0.6)
+        st = pstate(s)
+        rec = next(v for v in st["store"] if v["code"] == "E2E-VAL-1")
+        check("value: new voucher stores the euro amount and shows it",
+              rec.get("amount") == 25 and len(st["items"]) == 1
+              and "25 \u20ac" in st["items"][0]["text"],
+              (rec, st["items"][0]["text"]))
+
+        popup_add(s, "E2E-NOVAL-1", "2026-11-12")
+        time.sleep(0.6)
+        st = pstate(s)
+        rec = next(v for v in st["store"] if v["code"] == "E2E-NOVAL-1")
+        check("value: the amount stays optional (no key when empty)",
+              "amount" not in rec
+              and "\u20ac" not in st["items"][1]["text"],
+              (rec, st["items"][1]["text"]))
+
+        popup_add(s, "E2E-BADVAL-1", "2026-11-13", "abc")
+        time.sleep(0.6)
+        st = pstate(s)
+        check("value: an invalid amount is rejected inline, nothing added",
+              len(st["items"]) == 2 and not st["status"]["hidden"]
+              and "value in euros" in st["status"]["text"], st["status"])
+
+        # editing loads the amount and can change (or clear) it
+        s.page_js("document.querySelector('.voucher-item .edit-btn').click();"
+                  "return 'ok';")
+        time.sleep(0.4)
+        loaded = s.page_js("return document.getElementById('voucherValue').value;")
+        s.page_js("document.getElementById('voucherValue').value = '30,5';"
+                  "document.getElementById('addVoucherForm').dispatchEvent("
+                  "  new Event('submit', {bubbles: true, cancelable: true}));"
+                  "return 'ok';")
+        time.sleep(0.6)
+        st = pstate(s)
+        rec = next(v for v in st["store"] if v["code"] == "E2E-VAL-1")
+        check("value: edit loads the amount, comma decimals accepted",
+              loaded == "25" and rec.get("amount") == 30.5,
+              (loaded, rec))
 
         # ---- cross-device sync (the whole stack runs in the test page:
         # popup.js pushes user actions to the sync area, background sync

@@ -279,6 +279,12 @@ input[type="date"]:focus {
   color: var(--label-color);
 }
 
+.voucher-item .amount {
+  font-size: 12px;
+  font-weight: 600;
+  color: #28a745;
+}
+
 .voucher-item.valid {
   border-left: 3px solid #28a745;
 }

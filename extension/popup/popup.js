@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Auto-dismiss timer for transient status messages
   let statusTimer = null;
   const expiryInput = document.getElementById('expiryDate');
+  const valueInput = document.getElementById('voucherValue');
   const calendarBtn = document.getElementById('calendarToggle');
   const calendarPanel = document.getElementById('calendarPanel');
   const expiryGhost = document.getElementById('expiryGhost');
@@ -45,6 +46,9 @@ document.addEventListener('DOMContentLoaded', function() {
       addVoucherTitle: 'Add New Voucher',
       codeLabel: 'Code:',
       codePlaceholder: 'e.g., ABC123XYZ',
+      valueLabel: 'Value (\u20ac):',
+      valuePlaceholder: 'e.g., 25',
+      errValue: 'Enter a value in euros (e.g., 25).',
       expiryLabel: 'Expiration Date:',
       calendarAria: 'Pick a date from the calendar',
       calendarTitle: 'Pick a date',
@@ -89,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
       weekdays: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
       helpSections: [
         { title: 'Adding a voucher',
-          text: 'Enter the voucher code and its expiration date, then press Add Voucher. The date format is YYYY-MM-DD; use the calendar button to pick a date.',
+          text: 'Enter the voucher code, its value in euros (optional) and its expiration date, then press Add Voucher. The date format is YYYY-MM-DD; use the calendar button to pick a date.',
           items: [] },
         { title: 'Managing vouchers',
           text: '',
@@ -118,6 +122,9 @@ document.addEventListener('DOMContentLoaded', function() {
       addVoucherTitle: 'Ajouter un bon',
       codeLabel: 'Code :',
       codePlaceholder: 'ex. ABC123XYZ',
+      valueLabel: 'Valeur (\u20ac) :',
+      valuePlaceholder: 'ex. 25',
+      errValue: 'Saisissez une valeur en euros (ex. 25).',
       expiryLabel: 'Date d\u2019expiration :',
       calendarAria: 'Choisir une date dans le calendrier',
       calendarTitle: 'Choisir une date',
@@ -162,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
       weekdays: ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'],
       helpSections: [
         { title: 'Ajouter un bon',
-          text: 'Saisissez le code du bon et sa date d\u2019expiration, puis appuyez sur Ajouter. Le format de date est AAAA-MM-JJ ; utilisez le bouton calendrier pour choisir une date.',
+          text: 'Saisissez le code du bon, sa valeur en euros (facultative) et sa date d\u2019expiration, puis appuyez sur Ajouter. Le format de date est AAAA-MM-JJ ; utilisez le bouton calendrier pour choisir une date.',
           items: [] },
         { title: 'G\u00e9rer les bons',
           text: '',
@@ -480,15 +487,38 @@ document.addEventListener('DOMContentLoaded', function() {
     expiryGhost.replaceChildren(typed, rest);
   }
 
+  // Parse the optional value-in-euros field. Returns a positive number
+  // rounded to cents, or null when the field is empty; invalid input
+  // returns undefined (the caller shows an inline error)
+  function parseValueInput(str) {
+    if (str === '') return null;
+    const parsed = Number.parseFloat(str.replace(',', '.'));
+    if (!isFinite(parsed) || parsed <= 0 || parsed > 10000) return undefined;
+    return Math.round(parsed * 100) / 100;
+  }
+
+  // Format the euro amount for display ("25 €", French decimal comma)
+  function formatAmount(amount) {
+    let text = String(amount);
+    if (currentLang === 'fr') text = text.replace('.', ',');
+    return text + ' \u20ac';
+  }
+
   // Form submission
   addVoucherForm.addEventListener('submit', function(e) {
     e.preventDefault();
 
     const code = document.getElementById('voucherCode').value.trim().toUpperCase();
     const rawDate = expiryInput.value.trim();
+    const amount = parseValueInput(valueInput.value.trim());
 
     if (!code || !rawDate) {
       showStatus(t('errFillBoth'), 'error');
+      return;
+    }
+
+    if (amount === undefined) {
+      showStatus(t('errValue'), 'error');
       return;
     }
 
@@ -523,6 +553,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         edited.code = code;
         edited.expiryDate = expiryDate;
+        if (amount === null) delete edited.amount;
+        else edited.amount = amount;
         vouchers.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
         browser.storage.local.set({ vouchers: vouchers }).then(function() {
           cancelEdit();
@@ -548,6 +580,8 @@ document.addEventListener('DOMContentLoaded', function() {
         expiryDate: expiryDate,
         createdAt: new Date().toISOString()
       };
+      // The euro value is optional: vouchers without one carry no key
+      if (amount !== null) newVoucher.amount = amount;
 
       vouchers.push(newVoucher);
 
@@ -584,6 +618,8 @@ document.addEventListener('DOMContentLoaded', function() {
       if (!voucher) return;
       editingId = id;
       document.getElementById('voucherCode').value = voucher.code;
+      valueInput.value = (voucher.amount !== undefined && voucher.amount !== null)
+          ? String(voucher.amount) : '';
       expiryInput.value = voucher.expiryDate;
       updateGhost();
       submitBtn.textContent = t('updateVoucher');
@@ -778,6 +814,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
       const info = buildNode('div');
       info.appendChild(buildNode('div', 'code', voucher.code));
+      if (voucher.amount !== undefined && voucher.amount !== null) {
+        info.appendChild(buildNode('div', 'amount',
+                                  formatAmount(voucher.amount)));
+      }
       info.appendChild(buildNode('div', 'expiry', t('expiresPrefix') + formatDate(expiryDate)));
 
       const editBtn = buildNode('button', 'btn btn-secondary edit-btn', t('edit'));
