@@ -928,6 +928,7 @@ def popup_tests(s):
               about["name"] == "wagonBar" and about["version"] == ""
               and about["madeBy"] == "Made by: cabon14.com"
               and about["links"] == [["about-site", "https://cabon14.com/"],
+                                    ["about-site", "mailto:support@cabon14.com"],
                                     ["donate-liberapay", "https://liberapay.com/cabon14/"],
                                     ["donate-tipeee", "https://fr.tipeee.com/cabon14/"]],
               about)

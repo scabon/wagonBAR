@@ -114,6 +114,8 @@ document.addEventListener('DOMContentLoaded', function() {
       aboutNote: 'Not affiliated with SNCF. Your vouchers stay in your own browser.',
       madeBy: 'Made by:',
       aboutSite: 'cabon14.com',
+      supportLabel: 'Support:',
+      supportEmail: 'support@cabon14.com',
       donateTitle: 'Support wagonBar',
       donateLiberapay: 'Donate on Liberapay',
       donateTipeee: 'Tip on Tipeee'
@@ -194,6 +196,8 @@ document.addEventListener('DOMContentLoaded', function() {
       aboutNote: 'Non affili\u00e9 \u00e0 la SNCF. Vos bons restent dans votre navigateur.',
       madeBy: 'Cr\u00e9\u00e9 par :',
       aboutSite: 'cabon14.com',
+      supportLabel: 'Assistance :',
+      supportEmail: 'support@cabon14.com',
       donateTitle: 'Soutenir wagonBar',
       donateLiberapay: 'Soutenir sur Liberapay',
       donateTipeee: 'Pourboire sur Tipeee'
@@ -398,6 +402,15 @@ document.addEventListener('DOMContentLoaded', function() {
     siteLine.appendChild(document.createTextNode(' '));
     siteLine.appendChild(site);
 
+    const support = document.createElement('a');
+    support.href = 'mailto:' + t('supportEmail');
+    support.className = 'about-site';
+    support.textContent = t('supportEmail');
+    const supportLine = buildNode('p');
+    supportLine.appendChild(buildNode('span', '', t('supportLabel')));
+    supportLine.appendChild(document.createTextNode(' '));
+    supportLine.appendChild(support);
+
     const donateTitle = buildNode('h2', '', t('donateTitle'));
     const liberapay = document.createElement('a');
     liberapay.href = DONATION_LIBERAPAY;
@@ -416,7 +429,8 @@ document.addEventListener('DOMContentLoaded', function() {
     donateRow.appendChild(tipeee);
 
     aboutContent.replaceChildren(name, versionNode, tagline, note,
-                                 siteLine, donateTitle, donateRow);
+                                 siteLine, supportLine,
+                                 donateTitle, donateRow);
   }
 
   // Firefox cannot open its native date picker inside an extension popup,
