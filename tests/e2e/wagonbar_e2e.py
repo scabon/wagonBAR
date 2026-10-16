@@ -220,6 +220,13 @@ SHIM = """
     var m = /e2e-seed=([^&]+)/.exec(location.search);
     if (m) seed = JSON.parse(decodeURIComponent(m[1]));
   } catch (e) {}
+  // optional initial settings (?e2e-settings=<json>, same encoding):
+  // theme/language/notifications for popup.js loadSettings
+  var settingsSeed = {};
+  try {
+    var ms = /e2e-settings=([^&]+)/.exec(location.search);
+    if (ms) settingsSeed = JSON.parse(decodeURIComponent(ms[1]));
+  } catch (e) {}
   var alerts = [];
   var confirms = [];
   var notifLog = [];
@@ -280,7 +287,7 @@ SHIM = """
                    } }
     };
   }
-  var localStore = { vouchers: seed };
+  var localStore = { vouchers: seed, settings: settingsSeed };
   var syncStore = {};
   var localArea = makeArea('local', localStore, [
     ['data-e2e-store', function(){ return localStore.vouchers || []; }],
@@ -349,7 +356,7 @@ SHIM = """
   root.setAttribute('data-e2e-store', JSON.stringify(seed));
   root.setAttribute('data-e2e-sync-store', '{}');
   root.setAttribute('data-e2e-device', '');
-  root.setAttribute('data-e2e-settings', '{}');
+  root.setAttribute('data-e2e-settings', JSON.stringify(settingsSeed));
   root.setAttribute('data-e2e-notifications', '[]');
   root.setAttribute('data-e2e-alerts', JSON.stringify(alerts));
   root.setAttribute('data-e2e-confirms', JSON.stringify(confirms));
@@ -1325,4 +1332,5 @@ def main():
     return 1 if failed else 0
 
 
-sys.exit(main())
+if __name__ == "__main__":
+    sys.exit(main())
