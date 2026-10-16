@@ -206,7 +206,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Donation links (see AGENTS.md, Donations section)
   const DONATION_LIBERAPAY = 'https://liberapay.com/cabon14/';
-  const DONATION_TIPEEE = 'https://fr.tipeee.com/cabon14/';
+  // Tipeee serves a French UI on fr.tipeee.com and an English UI on
+  // en.tipeee.com (same campaign) — pick per popup language.
+  const DONATION_TIPEEE_FR = 'https://fr.tipeee.com/cabon14/';
+  const DONATION_TIPEEE_EN = 'https://en.tipeee.com/cabon14/';
 
   let currentLang = 'en';
 
@@ -419,7 +422,7 @@ document.addEventListener('DOMContentLoaded', function() {
     liberapay.className = 'donate-liberapay';
     liberapay.textContent = t('donateLiberapay');
     const tipeee = document.createElement('a');
-    tipeee.href = DONATION_TIPEEE;
+    tipeee.href = currentLang === 'fr' ? DONATION_TIPEEE_FR : DONATION_TIPEEE_EN;
     tipeee.target = '_blank';
     tipeee.rel = 'noopener noreferrer';
     tipeee.className = 'donate-tipeee';
