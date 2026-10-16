@@ -614,6 +614,16 @@ select {
   color: var(--label-color);
 }
 
+.about-site {
+  font-size: 13px;
+  color: #0066cc;
+  text-decoration: none;
+}
+
+.about-site:hover {
+  text-decoration: underline;
+}
+
 .donate-row {
   display: flex;
   gap: 6px;

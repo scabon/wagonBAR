@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ],
       aboutTagline: 'A small reminder for your SNCF Connect vouchers.',
       aboutNote: 'Not affiliated with SNCF. Your vouchers stay in your own browser.',
+      aboutSite: 'cabon14.com',
       donateTitle: 'Support wagonBar',
       donateLiberapay: 'Donate on Liberapay',
       donateTipeee: 'Tip on Tipeee'
@@ -190,6 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ],
       aboutTagline: 'Un petit rappel pour vos bons SNCF Connect.',
       aboutNote: 'Non affili\u00e9 \u00e0 la SNCF. Vos bons restent dans votre navigateur.',
+      aboutSite: 'cabon14.com',
       donateTitle: 'Soutenir wagonBar',
       donateLiberapay: 'Soutenir sur Liberapay',
       donateTipeee: 'Pourboire sur Tipeee'
@@ -383,6 +385,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const tagline = buildNode('p', '', t('aboutTagline'));
     const note = buildNode('p', 'about-note', t('aboutNote'));
 
+    const site = document.createElement('a');
+    site.href = 'https://cabon14.com/';
+    site.target = '_blank';
+    site.rel = 'noopener noreferrer';
+    site.className = 'about-site';
+    site.textContent = t('aboutSite');
+    const siteLine = buildNode('p');
+    siteLine.appendChild(site);
+
     const donateTitle = buildNode('h2', '', t('donateTitle'));
     const liberapay = document.createElement('a');
     liberapay.href = DONATION_LIBERAPAY;
@@ -401,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function() {
     donateRow.appendChild(tipeee);
 
     aboutContent.replaceChildren(name, versionNode, tagline, note,
-                                 donateTitle, donateRow);
+                                 siteLine, donateTitle, donateRow);
   }
 
   // Firefox cannot open its native date picker inside an extension popup,

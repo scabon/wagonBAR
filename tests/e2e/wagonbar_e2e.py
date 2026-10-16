@@ -921,7 +921,8 @@ def popup_tests(s):
         check("menu: About shows wagonBar and the EU donation links",
               about["name"] == "wagonBar" and about["version"] == ""
               and about["links"] == [["donate-liberapay", "https://liberapay.com/cabon14/"],
-                                    ["donate-tipeee", "https://fr.tipeee.com/cabon14/"]],
+                                    ["donate-tipeee", "https://fr.tipeee.com/cabon14/"],
+                                    ["about-site", "https://cabon14.com/"]],
               about)
 
         s.page_js("document.querySelector('#view-about .back-btn').click(); return 'ok';")
