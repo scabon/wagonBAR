@@ -930,15 +930,33 @@ def popup_tests(s):
             " madeBy: c.querySelector('.about-site').parentElement.textContent.trim(),"
             " links: Array.from(c.querySelectorAll('a')).map(function(a)"
             "  {return [a.className, a.href];})});"))
-        # no browser.runtime in the test page, so the version stays empty
+        # no browser.runtime in the test page, so the version stays empty.
+        # Tipeee serves a French UI on fr.tipeee.com and an English one on
+        # en.tipeee.com (same campaign): the English popup gets the EN link
         check("menu: About shows wagonBar and the EU donation links",
               about["name"] == "wagonBar" and about["version"] == ""
               and about["madeBy"] == "Made by: cabon14.com"
               and about["links"] == [["about-site", "https://cabon14.com/"],
                                     ["about-site", "mailto:support@cabon14.com"],
                                     ["donate-liberapay", "https://liberapay.com/cabon14/"],
-                                    ["donate-tipeee", "https://fr.tipeee.com/cabon14/"]],
+                                    ["donate-tipeee", "https://en.tipeee.com/cabon14/"]],
               about)
+
+        # the French UI gets the French Tipeee page (e2e-settings seeds
+        # the language through the storage shim)
+        s.client.navigate(url + "?e2e-settings=" + quote(json.dumps(
+            {"language": "fr", "theme": "system", "notifications": True})))
+        time.sleep(1)
+        tipeee_fr = s.page_js(
+            "return document.querySelector('#aboutContent .donate-tipeee').href;")
+        liberapay_fr = s.page_js(
+            "return document.querySelector('#aboutContent .donate-liberapay').href;")
+        check("menu: French gets the fr.tipeee.com link, Liberapay unchanged",
+              tipeee_fr == "https://fr.tipeee.com/cabon14/"
+              and liberapay_fr == "https://liberapay.com/cabon14/",
+              (tipeee_fr, liberapay_fr))
+        s.client.navigate(url)
+        time.sleep(1)
 
         s.page_js("document.querySelector('#view-about .back-btn').click(); return 'ok';")
         s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
