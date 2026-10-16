@@ -46,6 +46,7 @@ import tempfile
 import threading
 import time
 import zipfile
+import calendar
 from datetime import date, datetime, timedelta, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
@@ -579,9 +580,14 @@ def popup_tests(s):
               cal_dis["pastDisabled"] == now.tm_mday - 1
               and cal_dis["todayDisabled"] is False, cal_dis)
 
+        # pick a day that is always selectable: tomorrow, falling back to
+        # today on the last day of the month (both are >= today, so the
+        # pick is never a disabled past day whatever the run date)
+        days_in_month = calendar.monthrange(now.tm_year, now.tm_mon)[1]
+        pick_day = min(now.tm_mday + 1, days_in_month)
         s.page_js(
             "document.getElementById('calendarPanel')"
-            ".querySelectorAll('.calendar-day')[14].click(); return 'ok';"
+            ".querySelectorAll('.calendar-day')[%d].click(); return 'ok';" % (pick_day - 1)
         )
         time.sleep(0.3)
         cal = json.loads(s.page_js(
@@ -589,7 +595,7 @@ def popup_tests(s):
             "return JSON.stringify({hidden: p.hidden,"
             " value: document.getElementById('expiryDate').value});"
         ))
-        picked = "%d-%02d-15" % (now.tm_year, now.tm_mon)
+        picked = "%d-%02d-%02d" % (now.tm_year, now.tm_mon, pick_day)
         check("calendar: picking a day fills the field YYYY-MM-DD and closes",
               cal["hidden"] is True and cal["value"] == picked, cal)
 
@@ -597,12 +603,11 @@ def popup_tests(s):
         popup_add(s, "E2E-PICKED-1", picked)
         time.sleep(0.6)
         st = pstate(s)
-        picked_iso = "%d-%02d-15" % (now.tm_year, now.tm_mon)
         check("popup: calendar-picked date accepted on submit (ISO storage)",
               len(st["items"]) == 3
               and any(v["code"] == "E2E-PICKED-1"
-                      and v["expiryDate"] == picked_iso for v in st["store"]),
-              (st["store"], picked_iso))
+                      and v["expiryDate"] == picked for v in st["store"]),
+              (st["store"], picked))
 
         # date entry: digits are auto-dashed (the dash appears as soon as
         # the year or month is complete) and the remaining format is kept
@@ -920,9 +925,9 @@ def popup_tests(s):
         # no browser.runtime in the test page, so the version stays empty
         check("menu: About shows wagonBar and the EU donation links",
               about["name"] == "wagonBar" and about["version"] == ""
-              and about["links"] == [["donate-liberapay", "https://liberapay.com/cabon14/"],
-                                    ["donate-tipeee", "https://fr.tipeee.com/cabon14/"],
-                                    ["about-site", "https://cabon14.com/"]],
+              and about["links"] == [["about-site", "https://cabon14.com/"],
+                                    ["donate-liberapay", "https://liberapay.com/cabon14/"],
+                                    ["donate-tipeee", "https://fr.tipeee.com/cabon14/"]],
               about)
 
         s.page_js("document.querySelector('#view-about .back-btn').click(); return 'ok';")
