@@ -920,11 +920,13 @@ def popup_tests(s):
             "return JSON.stringify({"
             " name: c.querySelector('.about-name').textContent,"
             " version: c.querySelector('.about-version').textContent,"
+            " madeBy: c.querySelector('.about-site').parentElement.textContent.trim(),"
             " links: Array.from(c.querySelectorAll('a')).map(function(a)"
             "  {return [a.className, a.href];})});"))
         # no browser.runtime in the test page, so the version stays empty
         check("menu: About shows wagonBar and the EU donation links",
               about["name"] == "wagonBar" and about["version"] == ""
+              and about["madeBy"] == "Made by: cabon14.com"
               and about["links"] == [["about-site", "https://cabon14.com/"],
                                     ["donate-liberapay", "https://liberapay.com/cabon14/"],
                                     ["donate-tipeee", "https://fr.tipeee.com/cabon14/"]],

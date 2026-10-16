@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ],
       aboutTagline: 'A small reminder for your SNCF Connect vouchers.',
       aboutNote: 'Not affiliated with SNCF. Your vouchers stay in your own browser.',
+      madeBy: 'Made by:',
       aboutSite: 'cabon14.com',
       donateTitle: 'Support wagonBar',
       donateLiberapay: 'Donate on Liberapay',
@@ -191,6 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ],
       aboutTagline: 'Un petit rappel pour vos bons SNCF Connect.',
       aboutNote: 'Non affili\u00e9 \u00e0 la SNCF. Vos bons restent dans votre navigateur.',
+      madeBy: 'Cr\u00e9\u00e9 par :',
       aboutSite: 'cabon14.com',
       donateTitle: 'Soutenir wagonBar',
       donateLiberapay: 'Soutenir sur Liberapay',
@@ -392,6 +394,8 @@ document.addEventListener('DOMContentLoaded', function() {
     site.className = 'about-site';
     site.textContent = t('aboutSite');
     const siteLine = buildNode('p');
+    siteLine.appendChild(buildNode('span', '', t('madeBy')));
+    siteLine.appendChild(document.createTextNode(' '));
     siteLine.appendChild(site);
 
     const donateTitle = buildNode('h2', '', t('donateTitle'));
