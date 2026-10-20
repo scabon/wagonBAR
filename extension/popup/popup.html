@@ -128,9 +128,14 @@
       <div class="form-group checkbox-row">
         <label>
           <input type="checkbox" id="notificationsToggle" checked>
-          <span data-i18n="settingsNotifications">SNCF site notification</span>
+          <span data-i18n="settingsNotifications">Notifications</span>
         </label>
-        <p class="setting-hint" data-i18n="settingsNotificationsHint">Show a reminder when you open sncf-connect.com with valid vouchers</p>
+        <p class="setting-hint" data-i18n="settingsNotificationsHint">SNCF site arrival and voucher expiry reminders</p>
+      </div>
+      <div class="form-group">
+        <label for="leadDaysInput" data-i18n="settingsLeadDays">Expiry reminder (days before)</label>
+        <input type="number" id="leadDaysInput" min="1" max="30" value="7">
+        <p class="setting-hint" data-i18n="settingsLeadDaysHint">Notify me this many days before a voucher expires</p>
       </div>
     </div>
   </div>

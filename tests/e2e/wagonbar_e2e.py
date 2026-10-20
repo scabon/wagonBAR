@@ -334,6 +334,14 @@ SHIM = """
       onUpdated: { addListener: function(l){ tabUpdatedListeners.push(l); },
                     removeListener: function(){} },
       onRemoved: { addListener: function(){}, removeListener: function(){} }
+    },
+    // alarms: enough surface for background/expiry-notify.js to register
+    // its daily timer in the test page (the check itself is driven by
+    // storage change events, like the sync engine)
+    alarms: {
+      create: function(){ return Promise.resolve(); },
+      clear: function(){ return Promise.resolve(true); },
+      onAlarm: { addListener: function(){}, removeListener: function(){} }
     }
   };
   // Test channel for the sync area: Marionette scripts cannot call page
@@ -379,6 +387,8 @@ def build_popup_test_page(port):
                 os.path.join(d, "sync.js"))
     shutil.copy(os.path.join(EXT_DIR, "background", "sncf-notify.js"),
                 os.path.join(d, "sncf-notify.js"))
+    shutil.copy(os.path.join(EXT_DIR, "background", "expiry-notify.js"),
+                os.path.join(d, "expiry-notify.js"))
     html = open(os.path.join(POPUP_DIR, "popup.html"), encoding="utf-8").read()
     # the vendor polyfill and the shared script only run inside a real
     # extension; the test page runs against the shim instead (the shared
@@ -396,6 +406,7 @@ def build_popup_test_page(port):
                         + "\n  <script src=\"background.js\"></script>"
                         + "\n  <script src=\"sync.js\"></script>"
                         + "\n  <script src=\"sncf-notify.js\"></script>"
+                        + "\n  <script src=\"expiry-notify.js\"></script>"
                         + "\n  <script src=\"popup.js\"></script>")
     with open(os.path.join(d, "test-popup.html"), "w", encoding="utf-8") as fh:
         fh.write(html)
@@ -876,10 +887,11 @@ def popup_tests(s):
                 "function h(i){return document.getElementById(i).hidden;}"
                 "var ts = document.getElementById('themeSelect').value,"
                 "    ls = document.getElementById('languageSelect').value,"
-                "    nt = document.getElementById('notificationsToggle').checked;"
+                "    nt = document.getElementById('notificationsToggle').checked,"
+                "    ld = document.getElementById('leadDaysInput').value;"
                 "return JSON.stringify({main: h('view-main'),"
                 " settings: h('view-settings'), help: h('view-help'), about: h('view-about'),"
-                " theme: ts, lang: ls, notif: nt});"))
+                " theme: ts, lang: ls, notif: nt, lead: ld});"))
 
         s.client.navigate(url)
         time.sleep(1)
@@ -901,7 +913,8 @@ def popup_tests(s):
         check("menu: Settings view opens with system defaults",
               vs["main"] is True and vs["settings"] is False and vs["help"] is True
               and vs["about"] is True and vs["theme"] == "system"
-              and vs["lang"] == "system" and vs["notif"] is True, vs)
+              and vs["lang"] == "system" and vs["notif"] is True
+              and vs["lead"] == "7", vs)
 
         s.page_js("var s = document.getElementById('themeSelect'); s.value = 'dark';"
                   "s.dispatchEvent(new Event('change')); return 'ok';")
@@ -917,6 +930,14 @@ def popup_tests(s):
         st = pstate(s)
         check("menu: notifications toggle persists off",
               st["settings"].get("notifications") is False, st["settings"])
+
+        s.page_js("var ld = document.getElementById('leadDaysInput');"
+                  "ld.value = '3';"
+                  "ld.dispatchEvent(new Event('change')); return 'ok';")
+        time.sleep(0.2)
+        st = pstate(s)
+        check("menu: expiry lead days persist",
+              st["settings"].get("notifyLeadDays") == 3, st["settings"])
 
         s.page_js("document.querySelector('#view-settings .back-btn').click(); return 'ok';")
         s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
@@ -1063,6 +1084,81 @@ def popup_tests(s):
         st = pstate(s)
         check("notify: no notification when no voucher is valid",
               len(st["notifications"]) == 2, st["notifications"])
+
+        # ---- expiry lead-time notification (background/expiry-notify.js;
+        # the shim has an alarms mock, the check is driven by the storage
+        # change events the script itself listens to) ----
+        def notifs_for(code):
+            st = pstate(s)
+            return [n for n in st["notifications"] if code in n["message"]]
+
+        def settings_items(**kw):
+            base = {"theme": "system", "language": "system", "notifications": True}
+            base.update(kw)
+            return {"settings": base}
+
+        soon3_d = (date.today() + timedelta(days=3)).isoformat()
+        soon2_d = (date.today() + timedelta(days=2)).isoformat()
+        today_d = date.today().isoformat()
+        expiry_vouchers = [
+            {"id": "seed-e-1", "code": "E2E-EXPSOON-1",
+             "expiryDate": soon3_d, "createdAt": "2026-09-29T00:00:00.000Z"},
+            {"id": "seed-e-2", "code": "E2E-EXPTODAY-1",
+             "expiryDate": today_d, "createdAt": "2026-09-29T00:00:00.000Z"},
+            {"id": "seed-e-3", "code": "E2E-EXPFAR-1",
+             "expiryDate": "2028-06-30", "createdAt": "2026-09-29T00:00:00.000Z"},
+            {"id": "seed-e-4", "code": "E2E-OLDEXP-9",
+             "expiryDate": "2020-01-01", "createdAt": "2026-09-29T00:00:00.000Z"}]
+
+        page_cmd({"op": "local-set", "items": {"vouchers": expiry_vouchers}})
+        time.sleep(0.8)
+        check("expiry: vouchers inside the lead window notify, today included",
+              len(notifs_for("E2E-EXPSOON-1")) == 1
+              and len(notifs_for("E2E-EXPTODAY-1")) == 1
+              and "expires today" in notifs_for("E2E-EXPTODAY-1")[0]["message"]
+              and len(notifs_for("E2E-EXPFAR-1")) == 0,
+              pstate(s)["notifications"])
+
+        page_cmd({"op": "local-set", "items": {"vouchers": expiry_vouchers}})
+        time.sleep(0.8)
+        check("expiry: the same voucher never notifies twice",
+              len(notifs_for("E2E-EXPSOON-1")) == 1
+              and len(notifs_for("E2E-EXPTODAY-1")) == 1,
+              pstate(s)["notifications"])
+
+        # lead time 1 day: a voucher expiring in 2 days stays silent
+        page_cmd({"op": "local-set",
+                  "items": settings_items(notifyLeadDays=1)})
+        page_cmd({"op": "local-set", "items": {"vouchers":
+                    expiry_vouchers + [
+                        {"id": "seed-e-5", "code": "E2E-EXPLEAD-1",
+                         "expiryDate": soon2_d,
+                         "createdAt": "2026-09-29T00:00:00.000Z"}]}})
+        time.sleep(0.8)
+        check("expiry: a lead time of 1 day skips a voucher expiring in 2 days",
+              len(notifs_for("E2E-EXPLEAD-1")) == 0,
+              pstate(s)["notifications"])
+
+        # raising the lead time back to 7 notifies the pending voucher
+        page_cmd({"op": "local-set",
+                  "items": settings_items(notifyLeadDays=7)})
+        time.sleep(0.8)
+        check("expiry: raising the lead time notifies the pending voucher",
+              len(notifs_for("E2E-EXPLEAD-1")) == 1,
+              pstate(s)["notifications"])
+
+        # the notifications toggle gates the expiry reminder too
+        page_cmd({"op": "local-set",
+                  "items": settings_items(notifications=False)})
+        page_cmd({"op": "local-set", "items": {"vouchers":
+                    expiry_vouchers + [
+                        {"id": "seed-e-6", "code": "E2E-EXPOFF-1",
+                         "expiryDate": today_d,
+                         "createdAt": "2026-09-29T00:00:00.000Z"}]}})
+        time.sleep(0.8)
+        check("expiry: the settings toggle turns the expiry reminder off",
+              len(notifs_for("E2E-EXPOFF-1")) == 0,
+              pstate(s)["notifications"])
 
         # ---- voucher value in euros (optional field) ----
         s.client.navigate(url)

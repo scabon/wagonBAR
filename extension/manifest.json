@@ -22,14 +22,16 @@
   "permissions": [
     "storage",
     "tabs",
-    "notifications"
+    "notifications",
+    "alarms"
   ],
   "background": {
     "scripts": [
       "background/background.js",
       "shared/sync-common.js",
       "background/sync.js",
-      "background/sncf-notify.js"
+      "background/sncf-notify.js",
+      "background/expiry-notify.js"
     ]
   },
   "browser_specific_settings": {

@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const themeSelect = document.getElementById('themeSelect');
   const languageSelect = document.getElementById('languageSelect');
   const notificationsToggle = document.getElementById('notificationsToggle');
+  const leadDaysInput = document.getElementById('leadDaysInput');
   const helpContent = document.getElementById('helpContent');
   const aboutContent = document.getElementById('aboutContent');
 
@@ -75,8 +76,10 @@ document.addEventListener('DOMContentLoaded', function() {
       themeDark: 'Dark',
       settingsLanguage: 'Language',
       langSystem: 'System',
-      settingsNotifications: 'SNCF site notification',
-      settingsNotificationsHint: 'Show a reminder when you open sncf-connect.com with valid vouchers',
+      settingsNotifications: 'Notifications',
+      settingsNotificationsHint: 'SNCF site arrival and voucher expiry reminders',
+      settingsLeadDays: 'Expiry reminder (days before)',
+      settingsLeadDaysHint: 'Notify me this many days before a voucher expires',
       errFillBoth: 'Please fill in both fields.',
       errValidDate: 'Enter a valid expiration date (YYYY-MM-DD).',
       errPastDate: 'The expiration date is in the past.',
@@ -157,8 +160,10 @@ document.addEventListener('DOMContentLoaded', function() {
       themeDark: 'Sombre',
       settingsLanguage: 'Langue',
       langSystem: 'Syst\u00e8me',
-      settingsNotifications: 'Notification sur le site SNCF',
-      settingsNotificationsHint: 'Affiche un rappel quand vous ouvrez sncf-connect.com avec des bons valides',
+      settingsNotifications: 'Notifications',
+      settingsNotificationsHint: 'Rappels : arriv\u00e9e sur le site SNCF et expiration des bons',
+      settingsLeadDays: 'Rappel d\u2019expiration (jours avant)',
+      settingsLeadDaysHint: 'M\u2019alerter ce nombre de jours avant l\u2019expiration d\u2019un bon',
       errFillBoth: 'Veuillez remplir les deux champs.',
       errValidDate: 'Saisissez une date d\u2019expiration valide (AAAA-MM-JJ).',
       errPastDate: 'La date d\u2019expiration est dans le pass\u00e9.',
@@ -249,7 +254,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const DEFAULT_SETTINGS = {
     theme: 'system',      // 'system' | 'light' | 'dark'
     language: 'system',   // 'system' | 'en' | 'fr'
-    notifications: true
+    notifications: true,
+    notifyLeadDays: 7     // days before expiry to send the lead-time reminder
   };
   let settings = Object.assign({}, DEFAULT_SETTINGS);
 
@@ -290,6 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
       themeSelect.value = settings.theme;
       languageSelect.value = settings.language;
       notificationsToggle.checked = settings.notifications;
+      leadDaysInput.value = settings.notifyLeadDays;
       applyTheme();
       applyLanguage();
     });
@@ -313,6 +320,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
   notificationsToggle.addEventListener('change', function() {
     settings.notifications = notificationsToggle.checked;
+    saveSettings();
+  });
+
+  // The lead-time reminder is clamped to 1-30 days (matching the
+  // background script's validation)
+  leadDaysInput.addEventListener('change', function() {
+    const n = parseInt(leadDaysInput.value, 10);
+    if (isNaN(n)) return;
+    const clamped = Math.min(30, Math.max(1, n));
+    if (clamped !== n) leadDaysInput.value = clamped;
+    settings.notifyLeadDays = clamped;
     saveSettings();
   });
 
