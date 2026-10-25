@@ -1,8 +1,9 @@
 // SNCF site arrival notification. When the user opens sncf-connect.com
 // with at least one valid voucher, fire one system notification
-// ("You have N valid vouchers"). No content script and no host
-// permission: the tabs permission only lets the background script read
-// tab URLs (v1.3 privacy stance).
+// ("You have N valid vouchers. Nearest expiry: {date} (in N days).",
+// with "expires today" when the nearest one runs out today). No content
+// script and no host permission: the tabs permission only lets the
+// background script read tab URLs (v1.3 privacy stance).
 // Safari has no webextensions notifications API at all (MDN BCD), so
 // this degrades to a no-op there.
 
@@ -10,6 +11,8 @@
   if (!browser.notifications || !browser.tabs || !browser.tabs.onUpdated) {
     return; // no notifications API (Safari) or unexpected environment
   }
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
 
   // sncf-connect.com and all its subdomains
   const SNCF_HOST_RE = /(^|\.)sncf-connect\.com$/i;
@@ -24,20 +27,30 @@
     en: {
       one: 'You have 1 valid voucher.',
       many: 'You have {n} valid vouchers.',
-      soonest: ' Nearest expiry: {date}.'
+      soonest: ' Nearest expiry: {date} (in {days} {unit}).',
+      today: ' Nearest expiry: {date} (expires today).',
+      unit: { one: 'day', many: 'days' }
     },
     fr: {
       one: 'Vous avez 1 bon valide.',
       many: 'Vous avez {n} bons valides.',
-      soonest: ' Expiration la plus proche : {date}.'
+      soonest: ' Expiration la plus proche : {date} (dans {days} {unit}).',
+      today: ' Expiration la plus proche : {date} (expire aujourd\u2019hui).',
+      unit: { one: 'jour', many: 'jours' }
     }
   };
 
-  function messageFor(lang, count, soonest) {
+  function messageFor(lang, count, soonest, daysLeft) {
     const dict = MESSAGES[lang] || MESSAGES.en;
     let text = count === 1 ? dict.one : dict.many.split('{n}').join(count);
     if (soonest) {
-      text += dict.soonest.split('{date}').join(soonest);
+      // Same days-suffix format as the expiry notification (singular
+      // handled, "expires today" when the nearest one runs out today)
+      const template = daysLeft <= 0 ? dict.today : dict.soonest;
+      const unit = daysLeft === 1 ? dict.unit.one : dict.unit.many;
+      text += template.split('{date}').join(soonest)
+                       .split('{days}').join(daysLeft)
+                       .split('{unit}').join(unit);
     }
     return text;
   }
@@ -78,6 +91,12 @@
       // Oldest-first sort from getValidVouchers: the first expiry is
       // the nearest one
       const soonest = valid[0].expiryDate;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      // Parse as local midnight, same as getValidVouchers in
+      // background.js (a date-only string reads as UTC otherwise)
+      const daysLeft = Math.round(
+          (new Date(soonest + 'T00:00:00') - today) / DAY_MS);
       const lang = resolveLanguage(settings.language);
       let iconUrl = 'icons/icon-128.png';
       if (browser.runtime && browser.runtime.getURL) {
@@ -88,7 +107,7 @@
         type: 'basic',
         iconUrl: iconUrl,
         title: 'wagonBar',
-        message: messageFor(lang, valid.length, soonest)
+        message: messageFor(lang, valid.length, soonest, daysLeft)
       });
     } catch (e) {
       console.log('wagonBar: arrival notification failed:', e);

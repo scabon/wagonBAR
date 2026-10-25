@@ -1123,11 +1123,14 @@ def popup_tests(s):
         tab_complete(11, "https://www.sncf-connect.com/")
         time.sleep(0.8)
         st = pstate(s)
+        days_to_nearest = (date(2026, 12, 1) - date.today()).days
         check("notify: SNCF arrival fires one notification with the valid count",
               len(st["notifications"]) == 1
               and st["notifications"][0]["title"] == "wagonBar"
               and "You have 2 valid vouchers" in st["notifications"][0]["message"]
-              and "2026-12-01" in st["notifications"][0]["message"],
+              and "2026-12-01" in st["notifications"][0]["message"]
+              and ("(in %d days)" % days_to_nearest)
+              in st["notifications"][0]["message"],
               st["notifications"])
 
         tab_complete(11, "https://www.sncf-connect.com/")
