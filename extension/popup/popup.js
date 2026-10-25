@@ -16,6 +16,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const themeSelect = document.getElementById('themeSelect');
   const languageSelect = document.getElementById('languageSelect');
   const notificationsToggle = document.getElementById('notificationsToggle');
+  const expiryNotificationsToggle = document.getElementById('expiryNotificationsToggle');
+  const leadDaysGroup = document.getElementById('leadDaysGroup');
   const leadDaysInput = document.getElementById('leadDaysInput');
   const helpContent = document.getElementById('helpContent');
   const aboutContent = document.getElementById('aboutContent');
@@ -78,6 +80,8 @@ document.addEventListener('DOMContentLoaded', function() {
       langSystem: 'System',
       settingsNotifications: 'Notifications',
       settingsNotificationsHint: 'SNCF site arrival and voucher expiry reminders',
+      settingsExpiryNotifications: 'Expiry reminders',
+      settingsExpiryNotificationsHint: 'Voucher expiry notifications',
       settingsLeadDays: 'Expiry reminder (days before)',
       settingsLeadDaysHint: 'Notify me this many days before a voucher expires',
       errFillBoth: 'Please fill in both fields.',
@@ -162,6 +166,8 @@ document.addEventListener('DOMContentLoaded', function() {
       langSystem: 'Syst\u00e8me',
       settingsNotifications: 'Notifications',
       settingsNotificationsHint: 'Rappels : arriv\u00e9e sur le site SNCF et expiration des bons',
+      settingsExpiryNotifications: 'Rappels d\u2019expiration',
+      settingsExpiryNotificationsHint: 'Notifications d\u2019expiration des bons',
       settingsLeadDays: 'Rappel d\u2019expiration (jours avant)',
       settingsLeadDaysHint: 'M\u2019alerter ce nombre de jours avant l\u2019expiration d\u2019un bon',
       errFillBoth: 'Veuillez remplir les deux champs.',
@@ -255,6 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
     theme: 'system',      // 'system' | 'light' | 'dark'
     language: 'system',   // 'system' | 'en' | 'fr'
     notifications: true,
+    expiryNotifications: true,
     notifyLeadDays: 7     // days before expiry to send the lead-time reminder
   };
   let settings = Object.assign({}, DEFAULT_SETTINGS);
@@ -296,6 +303,8 @@ document.addEventListener('DOMContentLoaded', function() {
       themeSelect.value = settings.theme;
       languageSelect.value = settings.language;
       notificationsToggle.checked = settings.notifications;
+      expiryNotificationsToggle.checked = settings.expiryNotifications;
+      leadDaysGroup.hidden = !settings.expiryNotifications;
       leadDaysInput.value = settings.notifyLeadDays;
       applyTheme();
       applyLanguage();
@@ -320,6 +329,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
   notificationsToggle.addEventListener('change', function() {
     settings.notifications = notificationsToggle.checked;
+    saveSettings();
+  });
+
+  expiryNotificationsToggle.addEventListener('change', function() {
+    settings.expiryNotifications = expiryNotificationsToggle.checked;
+    leadDaysGroup.hidden = !settings.expiryNotifications;
     saveSettings();
   });
 

@@ -5,7 +5,8 @@
 // default 7 days). Each voucher is notified once per expiry date: the
 // expiryNotified map in storage.local remembers {voucherId: expiryDate},
 // so editing a voucher to a new date re-arms it. Gated by the same
-// settings.notifications toggle as the SNCF site arrival notification.
+// settings.notifications toggle as the SNCF site arrival notification,
+// plus its own settings.expiryNotifications checkbox (both default on).
 // Safari has no notifications API (MDN BCD), so this degrades to a
 // no-op there; without browser.alarms (old engines) it stays dormant.
 
@@ -23,11 +24,13 @@
   const MESSAGES = {
     en: {
       today: 'Your voucher {code} expires today.',
-      soon: 'Your voucher {code} expires on {date}.'
+      soon: 'Your voucher {code} expires on {date} (in {days} {unit}).',
+      unit: { one: 'day', many: 'days' }
     },
     fr: {
       today: 'Votre bon {code} expire aujourd\u2019hui.',
-      soon: 'Votre bon {code} expire le {date}.'
+      soon: 'Votre bon {code} expire le {date} (dans {days} {unit}).',
+      unit: { one: 'jour', many: 'jours' }
     }
   };
 
@@ -41,7 +44,9 @@
   function messageFor(lang, code, date, daysLeft) {
     const dict = MESSAGES[lang] || MESSAGES.en;
     const template = daysLeft <= 0 ? dict.today : dict.soon;
-    return template.split('{code}').join(code).split('{date}').join(date);
+    const unit = daysLeft === 1 ? dict.unit.one : dict.unit.many;
+    return template.split('{code}').join(code).split('{date}').join(date)
+        .split('{days}').join(daysLeft).split('{unit}').join(unit);
   }
 
   function leadDaysFrom(settings) {
@@ -57,6 +62,9 @@
       const settings = data.settings || {};
       if (settings.notifications === false) {
         return; // the notifications toggle in Settings is off
+      }
+      if (settings.expiryNotifications === false) {
+        return; // the expiry-reminders checkbox in Settings is off
       }
       const leadDays = leadDaysFrom(settings);
 

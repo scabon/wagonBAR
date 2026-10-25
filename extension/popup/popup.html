@@ -121,7 +121,7 @@
         <label for="languageSelect" data-i18n="settingsLanguage">Language</label>
         <select id="languageSelect">
           <option value="system" data-i18n="langSystem" data-flag="&#127760;">System</option>
-          <option value="en">&#127462;&#127467; English</option>
+          <option value="en">&#127468;&#127463; English</option>
           <option value="fr">&#127467;&#127479; Fran&ccedil;ais</option>
         </select>
       </div>
@@ -132,7 +132,14 @@
         </label>
         <p class="setting-hint" data-i18n="settingsNotificationsHint">SNCF site arrival and voucher expiry reminders</p>
       </div>
-      <div class="form-group">
+      <div class="form-group checkbox-row">
+        <label>
+          <input type="checkbox" id="expiryNotificationsToggle" checked>
+          <span data-i18n="settingsExpiryNotifications">Expiry reminders</span>
+        </label>
+        <p class="setting-hint" data-i18n="settingsExpiryNotificationsHint">Voucher expiry notifications</p>
+      </div>
+      <div class="form-group" id="leadDaysGroup">
         <label for="leadDaysInput" data-i18n="settingsLeadDays">Expiry reminder (days before)</label>
         <input type="number" id="leadDaysInput" min="1" max="30" value="7">
         <p class="setting-hint" data-i18n="settingsLeadDaysHint">Notify me this many days before a voucher expires</p>

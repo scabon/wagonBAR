@@ -888,10 +888,12 @@ def popup_tests(s):
                 "var ts = document.getElementById('themeSelect').value,"
                 "    ls = document.getElementById('languageSelect').value,"
                 "    nt = document.getElementById('notificationsToggle').checked,"
+                "    et = document.getElementById('expiryNotificationsToggle').checked,"
+                "    lg = document.getElementById('leadDaysGroup').hidden,"
                 "    ld = document.getElementById('leadDaysInput').value;"
                 "return JSON.stringify({main: h('view-main'),"
                 " settings: h('view-settings'), help: h('view-help'), about: h('view-about'),"
-                " theme: ts, lang: ls, notif: nt, lead: ld});"))
+                " theme: ts, lang: ls, notif: nt, expiry: et, leadHidden: lg, lead: ld});"))
 
         s.client.navigate(url)
         time.sleep(1)
@@ -914,6 +916,7 @@ def popup_tests(s):
               vs["main"] is True and vs["settings"] is False and vs["help"] is True
               and vs["about"] is True and vs["theme"] == "system"
               and vs["lang"] == "system" and vs["notif"] is True
+              and vs["expiry"] is True and vs["leadHidden"] is False
               and vs["lead"] == "7", vs)
 
         s.page_js("var s = document.getElementById('themeSelect'); s.value = 'dark';"
@@ -930,6 +933,25 @@ def popup_tests(s):
         st = pstate(s)
         check("menu: notifications toggle persists off",
               st["settings"].get("notifications") is False, st["settings"])
+
+        s.page_js("document.getElementById('expiryNotificationsToggle').click();"
+                  "return 'ok';")
+        time.sleep(0.2)
+        st = pstate(s)
+        vs = view_state()
+        check("menu: expiry-reminders checkbox persists off, lead days hidden",
+              st["settings"].get("expiryNotifications") is False
+              and vs["leadHidden"] is True,
+              (st["settings"], vs))
+        s.page_js("document.getElementById('expiryNotificationsToggle').click();"
+                  "return 'ok';")
+        time.sleep(0.2)
+        st = pstate(s)
+        vs = view_state()
+        check("menu: expiry-reminders checkbox persists back on, lead days shown",
+              st["settings"].get("expiryNotifications") is True
+              and vs["leadHidden"] is False,
+              (st["settings"], vs))
 
         s.page_js("var ld = document.getElementById('leadDaysInput');"
                   "ld.value = '3';"
@@ -1116,6 +1138,7 @@ def popup_tests(s):
               len(notifs_for("E2E-EXPSOON-1")) == 1
               and len(notifs_for("E2E-EXPTODAY-1")) == 1
               and "expires today" in notifs_for("E2E-EXPTODAY-1")[0]["message"]
+              and "(in 3 days)" in notifs_for("E2E-EXPSOON-1")[0]["message"]
               and len(notifs_for("E2E-EXPFAR-1")) == 0,
               pstate(s)["notifications"])
 
@@ -1158,6 +1181,26 @@ def popup_tests(s):
         time.sleep(0.8)
         check("expiry: the settings toggle turns the expiry reminder off",
               len(notifs_for("E2E-EXPOFF-1")) == 0,
+              pstate(s)["notifications"])
+
+        # the dedicated expiry-reminders checkbox gates only the expiry
+        # notification (the master toggle is back on)
+        page_cmd({"op": "local-set",
+                  "items": settings_items(expiryNotifications=False)})
+        page_cmd({"op": "local-set", "items": {"vouchers":
+                    expiry_vouchers + [
+                        {"id": "seed-e-7", "code": "E2E-EXPEXPOFF-1",
+                         "expiryDate": today_d,
+                         "createdAt": "2026-09-29T00:00:00.000Z"}]}})
+        time.sleep(0.8)
+        check("expiry: the expiry-reminders checkbox silences the expiry notification",
+              len(notifs_for("E2E-EXPEXPOFF-1")) == 0,
+              pstate(s)["notifications"])
+        page_cmd({"op": "local-set",
+                  "items": settings_items(expiryNotifications=True)})
+        time.sleep(0.8)
+        check("expiry: re-checking the checkbox notifies the pending voucher",
+              len(notifs_for("E2E-EXPEXPOFF-1")) == 1,
               pstate(s)["notifications"])
 
         # ---- voucher value in euros (optional field) ----
