@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   const addVoucherForm = document.getElementById('addVoucherForm');
   const voucherList = document.getElementById('voucherList');
+  const sncfLink = document.getElementById('sncfLink');
   const totalVouchersSpan = document.getElementById('totalVouchers');
   const validVouchersSpan = document.getElementById('validVouchers');
   const validValueSpan = document.getElementById('validValue');
@@ -876,6 +877,7 @@ document.addEventListener('DOMContentLoaded', function() {
       validVouchersSpan.textContent = '0';
       validValueSpan.textContent = '0';
       removeExpiredBtn.hidden = true;
+      sncfLink.hidden = true; // nothing valid to use on the SNCF site
       return;
     }
 
@@ -937,6 +939,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // The bulk-clear action only makes sense when an expired voucher exists
     removeExpiredBtn.hidden = expiredCount === 0;
     if (removeExpiredBtn.hidden) resetRemoveExpiredBtn();
+
+    // The one-click SNCF Connect link only makes sense with a usable voucher
+    sncfLink.hidden = validCount === 0;
   }
 
   // Delete is a two-step action: first click arms the button,

@@ -525,12 +525,12 @@ def popup_tests(s):
         sncf = json.loads(s.page_js(
             "var a = document.getElementById('sncfLink');"
             "return JSON.stringify({href: a.href, target: a.target,"
-            " text: a.textContent.trim(), visible: !a.hidden});"))
-        check("popup: one-click SNCF Connect link under the voucher list",
+            " text: a.textContent.trim(), hidden: a.hidden});"))
+        check("popup: SNCF Connect link hidden with no valid vouchers",
               sncf["href"] == "https://www.sncf-connect.com/"
               and sncf["target"] == "_blank"
               and sncf["text"] == "Use your vouchers on SNCF Connect"
-              and sncf["visible"], sncf)
+              and sncf["hidden"] is True, sncf)
 
         popup_add(s, "", "")  # empty fields -> inline error, no native alert
         time.sleep(0.5)
@@ -569,6 +569,9 @@ def popup_tests(s):
               codes == ["E2E-EXPIRED-1", "E2E-SOON-111", "E2E-FUTURE-999"], codes)
         check("popup: totals 3 total / 2 valid",
               st["total"] == "3" and st["valid"] == "2", (st["total"], st["valid"]))
+        check("popup: SNCF Connect link shown with a valid voucher",
+              s.page_js(
+                  "return document.getElementById('sncfLink').hidden;") is False)
         cls = [i["cls"] for i in st["items"]]
         check("popup: expired vs valid color-coding",
               "expired" in cls[0] and "valid" in cls[1] and "expired" not in cls[1], cls)
