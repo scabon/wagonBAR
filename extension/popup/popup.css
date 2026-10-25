@@ -262,10 +262,8 @@ input[type="date"]:focus {
   background-color: #c82333;
 }
 
-.voucher-list {
-  max-height: 200px;
-  overflow-y: auto;
-}
+/* No inner scrollbar on the voucher list: the whole popup scrolls
+   (one scrollbar total, decided 2026-10-25) */
 
 .voucher-item {
   display: flex;
@@ -349,30 +347,12 @@ input[type="date"]:focus {
   background-color: #0052a3;
 }
 
-/* Scrollbar styling */
-.voucher-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.voucher-list::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-}
-
-.voucher-list::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 3px;
-}
-
-.voucher-list::-webkit-scrollbar-thumb:hover {
-  background: #999;
-}
-
 .btn-danger.confirm {
   background-color: #8a1420;
 }
 
 .status-message {
-  margin-top: 0;
+  margin-top: 10px;
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 13px;
@@ -475,12 +455,12 @@ input[type="date"]:focus {
   gap: 6px;
 }
 
-/* Reserve room for two lines of status message: showing or clearing a
-   message must never change the popup size. The spacing lives in the
-   slot's padding so the message margin cannot collapse out of it. */
+/* The status slot collapses to nothing when no message is shown; the
+   gap lives in the message's own margin-top. Showing/clearing a
+   message changes the popup height - accepted (2026-10-25) so the
+   idle popup stays compact. */
 .status-slot {
-  min-height: 60px;
-  padding-top: 10px;
+  min-height: 0;
 }
 
 .btn-secondary {

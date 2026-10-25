@@ -733,8 +733,9 @@ def popup_tests(s):
               (st["status"], st["store"]))
 
         # odd-length code: warning appears when focus leaves the code field,
-        # and the save is never blocked; showing/clearing a message must
-        # never change the popup size
+        # and the save is never blocked; showing/clearing a message may
+        # change the popup height (the status slot is no longer
+        # reserved), but never the width
         size = lambda: s.page_js(
             "return [document.body.offsetWidth, document.body.offsetHeight];")
         size_base = size()
@@ -747,23 +748,25 @@ def popup_tests(s):
               not st["status"]["hidden"] and "usual" in st["status"]["text"],
               st["status"])
         size_warn = size()
-        check("popup: popup size unchanged while the warning shows",
-              size_warn == size_base, (size_base, size_warn))
+        check("popup: width unchanged while the warning shows (height may grow)",
+              size_warn[0] == size_base[0] and size_warn[1] >= size_base[1],
+              (size_base, size_warn))
 
         # a very long code is truncated in the warning so the message
-        # can never overflow the reserved space
+        # stays on a single line
         s.page_js("var c = document.getElementById('voucherCode');"
                    "c.value = 'E2E-VERY-LONG-CODE-12345';"
                    "c.dispatchEvent(new Event('blur')); return 'ok';")
         time.sleep(0.2)
         st = pstate(s)
         size_trunc = size()
-        check("popup: long code truncated in the warning, size still stable",
+        check("popup: long code truncated in the warning, width still stable",
               not st["status"]["hidden"]
               and "\u2026" in st["status"]["text"]
               and "E2E-VERY-LONG-CODE-12345" not in st["status"]["text"]
-              and size_trunc == size_base,
-              (st["status"], size_base, size_trunc))
+              and size_trunc[0] == size_base[0]
+              and size_trunc[1] == size_warn[1],
+              (st["status"], size_base, size_warn, size_trunc))
 
         # transient messages can be clicked away and auto-expire
         s.page_js("document.getElementById('statusMessage').click(); return 'ok';")
@@ -828,8 +831,8 @@ def popup_tests(s):
               and fst["code"] == "" and fst["submit"] == "Add Voucher"
               and fst["cancelHidden"] is True,
               (st["status"], fst, st["store"]))
-        check("popup: popup size unchanged after the success message",
-              size_saved == size_base, (size_base, size_saved))
+        check("popup: width unchanged after the success message",
+              size_saved[0] == size_base[0], (size_base, size_saved))
 
         # cancel leaves edit mode without touching anything
         s.page_js("document.querySelectorAll('.voucher-item .edit-btn')[%d].click();"
