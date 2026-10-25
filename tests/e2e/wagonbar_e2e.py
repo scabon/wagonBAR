@@ -230,6 +230,7 @@ SHIM = """
   var alerts = [];
   var confirms = [];
   var notifLog = [];
+  var notifClickListeners = [];
   var tabUpdatedListeners = [];
   function clone(x){ return JSON.parse(JSON.stringify(x)); }
   var umbrella = [];
@@ -292,7 +293,9 @@ SHIM = """
   var localArea = makeArea('local', localStore, [
     ['data-e2e-store', function(){ return localStore.vouchers || []; }],
     ['data-e2e-device', function(){ return localStore.deviceId || ''; }],
-    ['data-e2e-settings', function(){ return localStore.settings || {}; }]
+    ['data-e2e-settings', function(){ return localStore.settings || {}; }],
+    ['data-e2e-exp-notified', function(){ return localStore.expiryNotified || {}; }],
+    ['data-e2e-exp-snooze', function(){ return localStore.expirySnooze || {}; }]
   ]);
   var syncArea = makeArea('sync', syncStore, [
     ['data-e2e-sync-store', function(){ return syncStore; }]
@@ -321,14 +324,25 @@ SHIM = """
       setBadgeTextColor: function(){ return Promise.resolve(); }
     },
     notifications: {
-      create: function(opts){
-        notifLog.push({title: opts.title, message: opts.message});
+      // real API signature: create(id, options); no id -> auto id
+      create: function(idOrOpts, maybeOpts){
+        var opts = maybeOpts || idOrOpts;
+        var id = maybeOpts ? idOrOpts
+                           : ('e2e-notif-' + (notifLog.length + 1));
+        notifLog.push({id: id, title: opts.title, message: opts.message,
+                       buttons: opts.buttons || null});
         root.setAttribute('data-e2e-notifications', JSON.stringify(notifLog));
-        return Promise.resolve('e2e-notif-' + notifLog.length);
+        return Promise.resolve(id);
       },
       clear: function(){ return Promise.resolve(true); },
       getAll: function(){ return Promise.resolve({}); },
-      onClicked: { addListener: function(){}, removeListener: function(){} }
+      onClicked: { addListener: function(l){ notifClickListeners.push(l); },
+                   removeListener: function(l){
+                     var i = notifClickListeners.indexOf(l);
+                     if (i >= 0) notifClickListeners.splice(i, 1);
+                   } }
+      // no onButtonClicked: this shim models the Firefox surface, where
+      // notification buttons don't exist and the click is the only action
     },
     tabs: {
       onUpdated: { addListener: function(l){ tabUpdatedListeners.push(l); },
@@ -352,6 +366,10 @@ SHIM = """
     if (cmd.op === 'set') syncArea.set(cmd.items);
     else if (cmd.op === 'remove') syncArea.remove(cmd.keys);
     else if (cmd.op === 'local-set') localArea.set(cmd.items);
+    else if (cmd.op === 'notif-click') {
+      // simulate the user clicking a system notification
+      notifClickListeners.forEach(function(l){ try { l(cmd.id); } catch(e){} });
+    }
     else if (cmd.op === 'tab-complete') {
       // simulate a tab finishing a page load (what background/sncf-notify.js
       // listens to in a real browser)
@@ -366,6 +384,8 @@ SHIM = """
   root.setAttribute('data-e2e-device', '');
   root.setAttribute('data-e2e-settings', JSON.stringify(settingsSeed));
   root.setAttribute('data-e2e-notifications', '[]');
+  root.setAttribute('data-e2e-exp-notified', '{}');
+  root.setAttribute('data-e2e-exp-snooze', '{}');
   root.setAttribute('data-e2e-alerts', JSON.stringify(alerts));
   root.setAttribute('data-e2e-confirms', JSON.stringify(confirms));
   root.setAttribute('data-e2e-badge', '');
@@ -429,6 +449,8 @@ def pstate(s):
         " store: JSON.parse(document.documentElement.getAttribute('data-e2e-store') || '[]'),"
         " settings: JSON.parse(document.documentElement.getAttribute('data-e2e-settings') || '{}'),"
         " notifications: JSON.parse(document.documentElement.getAttribute('data-e2e-notifications') || '[]'),"
+        " expNotified: JSON.parse(document.documentElement.getAttribute('data-e2e-exp-notified') || '{}'),"
+        " expSnooze: JSON.parse(document.documentElement.getAttribute('data-e2e-exp-snooze') || '{}'),"
         " syncStore: JSON.parse(document.documentElement.getAttribute('data-e2e-sync-store') || '{}'),"
         " badge: document.documentElement.getAttribute('data-e2e-badge') || '',"
         " deviceId: (function(){ var v = document.documentElement.getAttribute('data-e2e-device') || '';"
@@ -1202,6 +1224,43 @@ def popup_tests(s):
         check("expiry: re-checking the checkbox notifies the pending voucher",
               len(notifs_for("E2E-EXPEXPOFF-1")) == 1,
               pstate(s)["notifications"])
+
+        # ---- snooze: click the notification -> silent until the next day
+        st = pstate(s)
+        exp_notif = [n for n in st["notifications"]
+                     if "E2E-EXPEXPOFF-1" in n["message"]][-1]
+        check("expiry: notification carries its voucher id, hint, no buttons (Firefox surface)",
+              exp_notif["id"] == "wagonbar-exp-seed-e-7"
+              and exp_notif["buttons"] is None
+              and "Click to be reminded tomorrow" in exp_notif["message"],
+              exp_notif)
+
+        page_cmd({"op": "notif-click", "id": "wagonbar-exp-seed-e-7"})
+        time.sleep(0.5)
+        st = pstate(s)
+        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+        check("expiry: clicking the notification snoozes it until tomorrow",
+              st["expSnooze"].get("seed-e-7") == tomorrow
+              and "seed-e-7" not in st["expNotified"],
+              (st["expSnooze"], st["expNotified"]))
+
+        # a check while snoozed stays silent
+        page_cmd({"op": "local-set", "items": settings_items()})
+        time.sleep(0.8)
+        check("expiry: a snoozed voucher does not notify again",
+              len(notifs_for("E2E-EXPEXPOFF-1")) == 1,
+              pstate(s)["notifications"])
+
+        # time travel: the snooze date has passed -> the voucher notifies
+        page_cmd({"op": "local-set", "items": dict(
+            settings_items(),
+            expirySnooze={"seed-e-7": (date.today() - timedelta(days=1)).isoformat()})})
+        time.sleep(0.8)
+        st = pstate(s)
+        check("expiry: after the snooze date the voucher notifies again",
+              len(notifs_for("E2E-EXPEXPOFF-1")) == 2
+              and "seed-e-7" not in st["expSnooze"],
+              (st["notifications"], st["expSnooze"]))
 
         # ---- voucher value in euros (optional field) ----
         s.client.navigate(url)
