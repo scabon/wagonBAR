@@ -2,6 +2,7 @@
 
 document.addEventListener('DOMContentLoaded', function() {
   const addVoucherForm = document.getElementById('addVoucherForm');
+  const addToggleBtn = document.getElementById('addToggleBtn');
   const voucherList = document.getElementById('voucherList');
   const sncfLink = document.getElementById('sncfLink');
   const totalVouchersSpan = document.getElementById('totalVouchers');
@@ -49,6 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
       menuHelp: 'Help',
       menuAbout: 'About',
       addVoucherTitle: 'Add New Voucher',
+      addToggleTitle: 'Add a voucher',
       codeLabel: 'Code:',
       codePlaceholder: 'e.g., ABC123XYZ',
       valueLabel: 'Value (\u20ac):',
@@ -105,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
       weekdays: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
       helpSections: [
         { title: 'Adding a voucher',
-          text: 'Enter the voucher code, its value in euros (optional) and its expiration date, then press Add Voucher. The date format is YYYY-MM-DD; use the calendar button to pick a date.',
+          text: 'Press the + button to open the form, then enter the voucher code, its value in euros (optional) and its expiration date, and press Add Voucher. The date format is YYYY-MM-DD; use the calendar button to pick a date.',
           items: [] },
         { title: 'Managing vouchers',
           text: '',
@@ -141,6 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
       menuHelp: 'Aide',
       menuAbout: '\u00c0 propos',
       addVoucherTitle: 'Ajouter un bon',
+      addToggleTitle: 'Ajouter un bon',
       codeLabel: 'Code :',
       codePlaceholder: 'ex. ABC123XYZ',
       valueLabel: 'Valeur (\u20ac) :',
@@ -197,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
       weekdays: ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'],
       helpSections: [
         { title: 'Ajouter un bon',
-          text: 'Saisissez le code du bon, sa valeur en euros (facultative) et sa date d\u2019expiration, puis appuyez sur Ajouter. Le format de date est AAAA-MM-JJ ; utilisez le bouton calendrier pour choisir une date.',
+          text: 'Appuyez sur le bouton + pour ouvrir le formulaire, puis saisissez le code du bon, sa valeur en euros (facultative) et sa date d\u2019expiration, et appuyez sur Ajouter. Le format de date est AAAA-MM-JJ ; utilisez le bouton calendrier pour choisir une date.',
           items: [] },
         { title: 'G\u00e9rer les bons',
           text: '',
@@ -588,6 +591,19 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Form submission
+  // The add form is collapsed by default: the + button (or an Edit
+  // click) opens it; a successful add/update or Cancel collapses it
+  // again so the popup stays compact
+  function setFormOpen(open) {
+    addVoucherForm.hidden = !open;
+    addToggleBtn.textContent = open ? '\u2212' : '+';
+    addToggleBtn.setAttribute('aria-expanded', String(open));
+  }
+
+  addToggleBtn.addEventListener('click', function() {
+    setFormOpen(addVoucherForm.hidden); // hidden -> open, open -> close
+  });
+
   addVoucherForm.addEventListener('submit', function(e) {
     e.preventDefault();
 
@@ -645,8 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
           showStatus(t('statusUpdated'), 'success');
           syncWriteVoucher(edited);
         });
-        return;
-      }
+        return;      }
 
       // Add new voucher
 
@@ -676,6 +691,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addVoucherForm.reset();
         closeCalendar();
         updateGhost();
+        setFormOpen(false); // added: back to the compact list view
         loadVouchers();
         syncWriteVoucher(newVoucher);
       });
@@ -685,6 +701,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Warn (without blocking) when the code doesn't look like a usual
   // voucher code, as soon as the user leaves the code field
   document.getElementById('voucherCode').addEventListener('blur', function() {
+    if (addVoucherForm.hidden) return; // blur caused by the form collapsing
     const code = this.value.trim().toUpperCase();
     if (code && code.length !== EXPECTED_CODE_LENGTH) {
       const shown = code.length > 12 ? code.slice(0, 12) + '\u2026' : code;
@@ -707,6 +724,7 @@ document.addEventListener('DOMContentLoaded', function() {
       updateGhost();
       submitBtn.textContent = t('updateVoucher');
       cancelEditBtn.hidden = false;
+      setFormOpen(true); // editing needs the form in view
       document.getElementById('voucherCode').focus();
     });
   }
@@ -718,6 +736,7 @@ document.addEventListener('DOMContentLoaded', function() {
     submitBtn.textContent = t('addVoucher');
     cancelEditBtn.hidden = true;
     clearStatus();
+    setFormOpen(false); // done editing: back to the compact list view
   }
 
   cancelEditBtn.addEventListener('click', cancelEdit);

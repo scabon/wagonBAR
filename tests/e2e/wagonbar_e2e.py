@@ -478,6 +478,10 @@ def pstate(s):
 
 
 def popup_add(s, code, date, value=None):
+    # the add form is collapsed by default, like for a real user
+    s.page_js(
+        "if (document.getElementById('addVoucherForm').hidden)"
+        "  document.getElementById('addToggleBtn').click(); return 'ok';")
     s.page_js(
         "document.getElementById('voucherCode').value = %s;"
         "document.getElementById('voucherValue').value = %s;"
@@ -521,6 +525,33 @@ def popup_tests(s):
             " size: !!im && im.offsetWidth});"))
         check("popup: title carries the rendered extension icon",
               icon["present"] and icon["loaded"] and icon["size"] > 0, icon)
+
+        addform = json.loads(s.page_js(
+            "var f = document.getElementById('addVoucherForm'),"
+            "    b = document.getElementById('addToggleBtn');"
+            "return JSON.stringify({hidden: f.hidden, glyph: b.textContent,"
+            " expanded: b.getAttribute('aria-expanded')});"))
+        check("popup: add form collapsed by default behind the + button",
+              addform["hidden"] is True and addform["glyph"] == "+"
+              and addform["expanded"] == "false", addform)
+
+        s.page_js("document.getElementById('addToggleBtn').click();"
+                  "return 'ok';")
+        time.sleep(0.2)
+        addform = json.loads(s.page_js(
+            "var f = document.getElementById('addVoucherForm'),"
+            "    b = document.getElementById('addToggleBtn');"
+            "return JSON.stringify({hidden: f.hidden, glyph: b.textContent,"
+            " expanded: b.getAttribute('aria-expanded')});"))
+        check("popup: the + button opens the form",
+              addform["hidden"] is False and addform["glyph"] == "\u2212"
+              and addform["expanded"] == "true", addform)
+        s.page_js("document.getElementById('addToggleBtn').click();"
+                  "return 'ok';")
+        time.sleep(0.2)
+        check("popup: the \u2212 button collapses the form again",
+              s.page_js(
+                  "return document.getElementById('addVoucherForm').hidden;") is True)
 
         sncf = json.loads(s.page_js(
             "var a = document.getElementById('sncfLink');"
@@ -579,6 +610,9 @@ def popup_tests(s):
               ("Expires: " + soon_d) in st["items"][1]["text"], st["items"][1]["text"])
         check("popup: no dialogs during normal adds",
               st["alerts"] == [] and st["confirms"] == [], (st["alerts"], st["confirms"]))
+        check("popup: add form collapses again after a successful add",
+              s.page_js(
+                  "return document.getElementById('addVoucherForm').hidden;") is True)
 
         popup_add(s, "E2E-SOON-111", "2027-01-01")  # duplicate code
         time.sleep(0.8)
@@ -735,7 +769,12 @@ def popup_tests(s):
         # odd-length code: warning appears when focus leaves the code field,
         # and the save is never blocked; showing/clearing a message may
         # change the popup height (the status slot is no longer
-        # reserved), but never the width
+        # reserved), but never the width. The form is collapsed after
+        # the previous successful add - open it first, a real user
+        # cannot blur a field of a hidden form
+        s.page_js("if (document.getElementById('addVoucherForm').hidden)"
+                  "  document.getElementById('addToggleBtn').click();"
+                  "return 'ok';")
         size = lambda: s.page_js(
             "return [document.body.offsetWidth, document.body.offsetHeight];")
         size_base = size()
@@ -1341,6 +1380,9 @@ def popup_tests(s):
         s.page_js("document.querySelector('.voucher-item .edit-btn').click();"
                   "return 'ok';")
         time.sleep(0.4)
+        check("popup: clicking Edit opens the collapsed add form",
+              s.page_js(
+                  "return document.getElementById('addVoucherForm').hidden;") is False)
         loaded = s.page_js("return document.getElementById('voucherValue').value;")
         s.page_js("document.getElementById('voucherValue').value = '30,5';"
                   "document.getElementById('addVoucherForm').dispatchEvent("
@@ -1352,6 +1394,9 @@ def popup_tests(s):
         check("value: edit loads the amount, comma decimals accepted",
               loaded == "25" and rec.get("amount") == 30.5,
               (loaded, rec))
+        check("popup: add form collapses again after a successful update",
+              s.page_js(
+                  "return document.getElementById('addVoucherForm').hidden;") is True)
 
         # stats show the summed value of the valid vouchers
         st = pstate(s)

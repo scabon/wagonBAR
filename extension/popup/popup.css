@@ -371,6 +371,26 @@ input[type="date"]:focus {
   margin: 16px 0 8px 0;
 }
 
+/* +/− toggle for the add form (collapsed by default) */
+.add-toggle {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.add-toggle:hover {
+  border-color: #0066cc;
+  color: #0066cc;
+}
+
 /* Remove-expired bulk action next to the sort control */
 .list-controls {
   display: flex;

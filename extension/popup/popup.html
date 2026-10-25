@@ -43,8 +43,11 @@
     </div>
 
     <div class="section">
-      <h2 data-i18n="addVoucherTitle">Add New Voucher</h2>
-      <form id="addVoucherForm">
+      <div class="list-header">
+        <h2 data-i18n="addVoucherTitle">Add New Voucher</h2>
+        <button type="button" id="addToggleBtn" class="add-toggle" data-i18n-title="addToggleTitle" title="Add a voucher" aria-expanded="false">+</button>
+      </div>
+      <form id="addVoucherForm" hidden>
         <div class="form-group">
           <label for="voucherCode" data-i18n="codeLabel">Code:</label>
           <input type="text" id="voucherCode" data-i18n-placeholder="codePlaceholder" placeholder="e.g., ABC123XYZ" required>
