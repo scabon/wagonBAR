@@ -227,6 +227,14 @@ SHIM = """
     var ms = /e2e-settings=([^&]+)/.exec(location.search);
     if (ms) settingsSeed = JSON.parse(decodeURIComponent(ms[1]));
   } catch (e) {}
+  // optional draft (?e2e-draft=<json>, same encoding): a half-filled
+  // form left over from a previous popup instance, as saved by
+  // saveDraft() in popup.js
+  var draftSeed = null;
+  try {
+    var md2 = /e2e-draft=([^&]+)/.exec(location.search);
+    if (md2) draftSeed = JSON.parse(decodeURIComponent(md2[1]));
+  } catch (e) {}
   var alerts = [];
   var confirms = [];
   var notifLog = [];
@@ -288,14 +296,15 @@ SHIM = """
                    } }
     };
   }
-  var localStore = { vouchers: seed, settings: settingsSeed };
+  var localStore = { vouchers: seed, settings: settingsSeed, draft: draftSeed };
   var syncStore = {};
   var localArea = makeArea('local', localStore, [
     ['data-e2e-store', function(){ return localStore.vouchers || []; }],
     ['data-e2e-device', function(){ return localStore.deviceId || ''; }],
     ['data-e2e-settings', function(){ return localStore.settings || {}; }],
     ['data-e2e-exp-notified', function(){ return localStore.expiryNotified || {}; }],
-    ['data-e2e-exp-snooze', function(){ return localStore.expirySnooze || {}; }]
+    ['data-e2e-exp-snooze', function(){ return localStore.expirySnooze || {}; }],
+    ['data-e2e-draft', function(){ return localStore.draft || null; }]
   ]);
   var syncArea = makeArea('sync', syncStore, [
     ['data-e2e-sync-store', function(){ return syncStore; }]
@@ -399,6 +408,7 @@ SHIM = """
   root.setAttribute('data-e2e-notifications', '[]');
   root.setAttribute('data-e2e-exp-notified', '{}');
   root.setAttribute('data-e2e-exp-snooze', '{}');
+  root.setAttribute('data-e2e-draft', JSON.stringify(draftSeed));
   root.setAttribute('data-e2e-alerts', JSON.stringify(alerts));
   root.setAttribute('data-e2e-confirms', JSON.stringify(confirms));
   root.setAttribute('data-e2e-badge', '');
@@ -469,6 +479,7 @@ def pstate(s):
         " notifications: JSON.parse(document.documentElement.getAttribute('data-e2e-notifications') || '[]'),"
         " expNotified: JSON.parse(document.documentElement.getAttribute('data-e2e-exp-notified') || '{}'),"
         " expSnooze: JSON.parse(document.documentElement.getAttribute('data-e2e-exp-snooze') || '{}'),"
+        " draft: JSON.parse(document.documentElement.getAttribute('data-e2e-draft') || 'null'),"
         " syncStore: JSON.parse(document.documentElement.getAttribute('data-e2e-sync-store') || '{}'),"
         " badge: document.documentElement.getAttribute('data-e2e-badge') || '',"
         " deviceId: (function(){ var v = document.documentElement.getAttribute('data-e2e-device') || '';"
@@ -1418,6 +1429,66 @@ def popup_tests(s):
         check("value: sort by value puts the highest first, no-amount last",
               codes == ["E2E-VAL-2", "E2E-VAL-1", "E2E-NOVAL-1"]
               and st["value"] == "80.5", (codes, st["value"]))
+
+        # ---- draft: the popup is destroyed when it loses focus; a
+        # half-filled form survives as a storage.local draft ----
+        s.client.navigate(url + "?e2e-draft=" + quote(json.dumps(
+            {"code": "DRAFTTEST1", "value": "25", "date": "2027-02-02",
+             "open": True})))
+        time.sleep(1)
+        draft_st = json.loads(s.page_js(
+            "return JSON.stringify({"
+            " hidden: document.getElementById('addVoucherForm').hidden,"
+            " code: document.getElementById('voucherCode').value,"
+            " value: document.getElementById('voucherValue').value,"
+            " date: document.getElementById('expiryDate').value,"
+            " submit: document.getElementById('submitBtn').textContent,"
+            " cancelHidden: document.getElementById('cancelEditBtn').hidden});"))
+        check("draft: a saved draft reopens the form with its fields",
+              draft_st["hidden"] is False
+              and draft_st["code"] == "DRAFTTEST1"
+              and draft_st["value"] == "25"
+              and draft_st["date"] == "2027-02-02"
+              and draft_st["submit"] == "Add Voucher",
+              draft_st)
+
+        # an editing draft restores edit mode when the voucher exists
+        s.client.navigate(url + "?e2e-seed=" + quote(json.dumps(
+            [{"id": "draft-e-1", "code": "DRAFTEDIT1",
+              "expiryDate": "2027-03-03",
+              "createdAt": "2026-09-29T00:00:00.000Z"}]))
+            + "&e2e-draft=" + quote(json.dumps(
+                {"code": "DRAFTEDIT1", "value": "", "date": "2027-04-04",
+                 "editingId": "draft-e-1"})))
+        time.sleep(1)
+        draft_st = json.loads(s.page_js(
+            "return JSON.stringify({"
+            " hidden: document.getElementById('addVoucherForm').hidden,"
+            " date: document.getElementById('expiryDate').value,"
+            " submit: document.getElementById('submitBtn').textContent,"
+            " cancelHidden: document.getElementById('cancelEditBtn').hidden});"))
+        check("draft: an editing draft restores update mode",
+              draft_st["hidden"] is False
+              and draft_st["date"] == "2027-04-04"
+              and draft_st["submit"] == "Update Voucher"
+              and draft_st["cancelHidden"] is False,
+              draft_st)
+
+        # typing saves the draft; submitting (add or update) clears it
+        s.page_js("var c = document.getElementById('voucherCode');"
+                  "c.value = 'DRAFTNEW-1';"
+                  "c.dispatchEvent(new Event('input')); return 'ok';")
+        time.sleep(0.4)
+        st = pstate(s)
+        check("draft: typing persists the draft",
+              (st["draft"] or {}).get("code") == "DRAFTNEW-1", st["draft"])
+        popup_add(s, "DRAFTNEW-1", "2027-05-05")
+        time.sleep(0.6)
+        st = pstate(s)
+        check("draft: a successful submit clears the draft",
+              st["draft"] is None
+              and any(v["code"] == "DRAFTNEW-1" for v in st["store"]),
+              (st["draft"], st["store"]))
 
         # ---- cross-device sync (the whole stack runs in the test page:
         # popup.js pushes user actions to the sync area, background sync

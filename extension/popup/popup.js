@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
       weekdays: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
       helpSections: [
         { title: 'Adding a voucher',
-          text: 'Press the + button to open the form, then enter the voucher code, its value in euros (optional) and its expiration date, and press Add Voucher. The date format is YYYY-MM-DD; use the calendar button to pick a date.',
+          text: 'Press the + button to open the form, then enter the voucher code, its value in euros (optional) and its expiration date, and press Add Voucher. The date format is YYYY-MM-DD; use the calendar button to pick a date. If you close the popup mid-entry, your progress is restored when you reopen it.',
           items: [] },
         { title: 'Managing vouchers',
           text: '',
@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
       weekdays: ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'],
       helpSections: [
         { title: 'Ajouter un bon',
-          text: 'Appuyez sur le bouton + pour ouvrir le formulaire, puis saisissez le code du bon, sa valeur en euros (facultative) et sa date d\u2019expiration, et appuyez sur Ajouter. Le format de date est AAAA-MM-JJ ; utilisez le bouton calendrier pour choisir une date.',
+          text: 'Appuyez sur le bouton + pour ouvrir le formulaire, puis saisissez le code du bon, sa valeur en euros (facultative) et sa date d\u2019expiration, et appuyez sur Ajouter. Le format de date est AAAA-MM-JJ ; utilisez le bouton calendrier pour choisir une date. Si vous fermez le popup en cours de saisie, votre progression est restaur\u00e9e \u00e0 la r\u00e9ouverture.',
           items: [] },
         { title: 'G\u00e9rer les bons',
           text: '',
@@ -602,7 +602,56 @@ document.addEventListener('DOMContentLoaded', function() {
 
   addToggleBtn.addEventListener('click', function() {
     setFormOpen(addVoucherForm.hidden); // hidden -> open, open -> close
+    saveDraft();
   });
+
+  // The popup is destroyed the moment it loses focus (e.g. switching to
+  // the email to copy a voucher code): keep the half-filled form as a
+  // draft in storage.local and restore it on the next open
+  function saveDraft() {
+    browser.storage.local.set({
+      draft: {
+        code: document.getElementById('voucherCode').value,
+        value: valueInput.value,
+        date: expiryInput.value,
+        editingId: editingId,
+        open: !addVoucherForm.hidden
+      }
+    });
+  }
+
+  function clearDraft() {
+    browser.storage.local.remove('draft');
+  }
+
+  function restoreDraft() {
+    browser.storage.local.get(['draft', 'vouchers']).then(function(data) {
+      const draft = data.draft;
+      if (!draft) return;
+      document.getElementById('voucherCode').value = draft.code || '';
+      valueInput.value = draft.value || '';
+      expiryInput.value = draft.date || '';
+      updateGhost();
+      // Edit mode only if the voucher still exists (it may have been
+      // deleted from another device while the popup was closed)
+      const stillThere = draft.editingId
+          && (data.vouchers || []).some(v => v.id === draft.editingId);
+      if (stillThere) {
+        editingId = draft.editingId;
+        submitBtn.textContent = t('updateVoucher');
+        cancelEditBtn.hidden = false;
+      }
+      if (draft.code || draft.value || draft.date || stillThere
+          || draft.open) {
+        setFormOpen(true);
+      }
+    });
+  }
+
+  ['voucherCode', 'voucherValue', 'expiryDate'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', saveDraft);
+  });
+  restoreDraft();
 
   addVoucherForm.addEventListener('submit', function(e) {
     e.preventDefault();
@@ -692,6 +741,7 @@ document.addEventListener('DOMContentLoaded', function() {
         closeCalendar();
         updateGhost();
         setFormOpen(false); // added: back to the compact list view
+        clearDraft(); // submitted: nothing to restore next time
         loadVouchers();
         syncWriteVoucher(newVoucher);
       });
@@ -725,6 +775,7 @@ document.addEventListener('DOMContentLoaded', function() {
       submitBtn.textContent = t('updateVoucher');
       cancelEditBtn.hidden = false;
       setFormOpen(true); // editing needs the form in view
+      saveDraft();
       document.getElementById('voucherCode').focus();
     });
   }
@@ -737,6 +788,7 @@ document.addEventListener('DOMContentLoaded', function() {
     cancelEditBtn.hidden = true;
     clearStatus();
     setFormOpen(false); // done editing: back to the compact list view
+    clearDraft(); // abandoned: nothing to restore next time
   }
 
   cancelEditBtn.addEventListener('click', cancelEdit);
@@ -832,6 +884,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const picked = new Date(dayBtn.dataset.date + 'T00:00:00');
       expiryInput.value = formatDate(picked);
       updateGhost();
+      saveDraft(); // programmatic value change fires no input event
       closeCalendar();
     });
   }
