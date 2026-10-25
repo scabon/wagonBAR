@@ -332,6 +332,23 @@ input[type="date"]:focus {
   color: #0066cc;
 }
 
+/* One-click jump to the SNCF Connect site to use the vouchers */
+.sncf-link {
+  display: block;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background-color: #0066cc;
+  color: white;
+  text-align: center;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.sncf-link:hover {
+  background-color: #0052a3;
+}
+
 /* Scrollbar styling */
 .voucher-list::-webkit-scrollbar {
   width: 6px;

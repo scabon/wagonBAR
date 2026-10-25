@@ -522,6 +522,16 @@ def popup_tests(s):
         check("popup: title carries the rendered extension icon",
               icon["present"] and icon["loaded"] and icon["size"] > 0, icon)
 
+        sncf = json.loads(s.page_js(
+            "var a = document.getElementById('sncfLink');"
+            "return JSON.stringify({href: a.href, target: a.target,"
+            " text: a.textContent.trim(), visible: !a.hidden});"))
+        check("popup: one-click SNCF Connect link under the voucher list",
+              sncf["href"] == "https://www.sncf-connect.com/"
+              and sncf["target"] == "_blank"
+              and sncf["text"] == "Use your vouchers on SNCF Connect"
+              and sncf["visible"], sncf)
+
         popup_add(s, "", "")  # empty fields -> inline error, no native alert
         time.sleep(0.5)
         st = pstate(s)
