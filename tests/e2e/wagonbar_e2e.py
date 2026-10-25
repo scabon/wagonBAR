@@ -1074,7 +1074,8 @@ def popup_tests(s):
             ".map(function(h){return h.textContent;}));"))
         check("menu: Help lists the usage sections",
               headings == ["Adding a voucher", "Managing vouchers",
-                           "Sync across devices", "Privacy"], headings)
+                           "Notifications", "Sync across devices",
+                           "Privacy"], headings)
 
         # language switch to French, from the Settings view
         s.page_js("document.querySelector('#view-help .back-btn').click(); return 'ok';")
