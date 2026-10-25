@@ -46,10 +46,15 @@
     }
   };
 
-  // Notification buttons: Chromium only (MDN BCD - buttons and
-  // onButtonClicked are false on Firefox); detected, never assumed
-  const supportsButtons = !!(browser.notifications.onButtonClicked
-      && browser.notifications.onButtonClicked.addListener);
+  // Notification buttons are Chromium-only. Firefox DECLARES
+  // notifications.onButtonClicked in its schema (so its presence proves
+  // nothing) but marks the "buttons" option unsupported - passing it
+  // makes create() reject outright and no notification is shown at all.
+  // runtime.getBrowserInfo() is the inverse probe: a Firefox-only API,
+  // never present on Chromium.
+  const supportsButtons = !(browser.runtime && browser.runtime.getBrowserInfo)
+      && !!(browser.notifications.onButtonClicked
+           && browser.notifications.onButtonClicked.addListener);
 
   // Same language resolution as the popup and sncf-notify
   function resolveLanguage(setting) {

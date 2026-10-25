@@ -340,9 +340,13 @@ SHIM = """
                    removeListener: function(l){
                      var i = notifClickListeners.indexOf(l);
                      if (i >= 0) notifClickListeners.splice(i, 1);
-                   } }
-      // no onButtonClicked: this shim models the Firefox surface, where
-      // notification buttons don't exist and the click is the only action
+                   } },
+      // Firefox DECLARES onButtonClicked in its schema (an Event that
+      // never fires) while marking the buttons OPTION unsupported -
+      // passing buttons to create() rejects on the real Firefox surface.
+      // Exposed here so a buttons regression fails the "no buttons"
+      // check instead of silently passing like a button-less mock would.
+      onButtonClicked: { addListener: function(){}, removeListener: function(){} }
     },
     tabs: {
       onUpdated: { addListener: function(l){ tabUpdatedListeners.push(l); },
@@ -356,6 +360,15 @@ SHIM = """
       create: function(){ return Promise.resolve(); },
       clear: function(){ return Promise.resolve(true); },
       onAlarm: { addListener: function(){}, removeListener: function(){} }
+    },
+    // Firefox surface: runtime.getURL exists, and so does
+    // getBrowserInfo (Firefox-only) - expiry-notify.js uses its ABSENCE
+    // to detect Chromium and switch on notification buttons
+    runtime: {
+      getURL: function(p){ return 'moz-extension://e2e/' + p; },
+      getBrowserInfo: function(){
+        return Promise.resolve({name: 'Firefox', version: '137.0'});
+      }
     }
   };
   // Test channel for the sync area: Marionette scripts cannot call page
