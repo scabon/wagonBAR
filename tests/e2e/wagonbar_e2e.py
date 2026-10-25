@@ -422,7 +422,12 @@ def build_popup_test_page(port):
                 os.path.join(d, "sncf-notify.js"))
     shutil.copy(os.path.join(EXT_DIR, "background", "expiry-notify.js"),
                 os.path.join(d, "expiry-notify.js"))
+    # the h1 icon: copy the PNG in and make the src test-page-relative
+    # (the real popup's ../icons/ does not exist in the served dir)
+    shutil.copy(os.path.join(EXT_DIR, "icons", "icon-48.png"),
+                os.path.join(d, "icon-48.png"))
     html = open(os.path.join(POPUP_DIR, "popup.html"), encoding="utf-8").read()
+    html = html.replace('../icons/icon-48.png', 'icon-48.png')
     # the vendor polyfill and the shared script only run inside a real
     # extension; the test page runs against the shim instead (the shared
     # script is re-injected after it, with test-page-relative paths)
@@ -508,6 +513,14 @@ def popup_tests(s):
         check("popup: empty state (0 total, 0 valid, empty message)",
               st["total"] == "0" and st["valid"] == "0"
               and "No vouchers yet" in st["empty"], st["empty"])
+
+        icon = json.loads(s.page_js(
+            "var im = document.querySelector('h1 img');"
+            "return JSON.stringify({present: !!im,"
+            " loaded: !!im && im.complete && im.naturalWidth > 0,"
+            " size: !!im && im.offsetWidth});"))
+        check("popup: title carries the rendered extension icon",
+              icon["present"] and icon["loaded"] and icon["size"] > 0, icon)
 
         popup_add(s, "", "")  # empty fields -> inline error, no native alert
         time.sleep(0.5)
