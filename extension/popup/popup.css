@@ -224,13 +224,14 @@ input[type="date"]:focus {
 }
 
 .calendar-day:disabled {
-  color: var(--label-color);
+  color: var(--text-color);
+  opacity: 0.4;
   cursor: default;
 }
 
 .calendar-day:disabled:hover {
   background: none;
-  color: var(--label-color);
+  opacity: 0.4;
 }
 
 .calendar-day.selected {
