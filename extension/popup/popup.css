@@ -40,12 +40,16 @@ body {
   background-color: var(--bg-color);
   margin: 0;
   padding: 0;
-  min-width: 350px;
 }
 
+/* Fixed 350px on desktop gives the popup its size; max-width lets the
+   layout shrink on narrow mobile screens (Firefox for Android opens the
+   popup as a full-width sheet) instead of clipping at 350px */
 .container {
   padding: 16px;
   width: 350px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 h1 {
@@ -678,4 +682,86 @@ select {
 
 .donate-row a:hover {
   opacity: 0.85;
+}
+
+/* Touch devices (Firefox for Android): bigger tap targets on the small
+   controls and press feedback via :active. :hover still applies after a
+   tap (sticky hover) but stays cosmetic. Desktop is untouched - these
+   rules only match coarse pointers. */
+@media (pointer: coarse) {
+  /* Firefox for Android sizes the popup sheet to the page content;
+     filling 100% lets the panel take the full available width instead
+     of the desktop 350px card. */
+  .container {
+    width: 100%;
+  }
+
+  /* The hamburger is an absolutely pinned 36px box on desktop sizing;
+     on touch, make the header a centered flex row so the button and
+     the title text align on the same line. */
+  .popup-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #0066cc;
+    margin-bottom: 16px;
+  }
+
+  .popup-header h1 {
+    flex: 1;
+    margin: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .menu-btn {
+    position: static;
+  }
+
+  .menu-panel {
+    top: 48px;
+  }
+
+  .add-toggle,
+  .menu-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .calendar-btn {
+    min-width: 44px;
+  }
+
+  .calendar-nav {
+    padding: 8px 12px;
+  }
+
+  .calendar-day {
+    padding: 8px 0;
+    font-size: 14px;
+  }
+
+  .calendar-weekday {
+    padding: 6px 0;
+  }
+
+  .remove-expired-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .back-btn {
+    padding: 4px 10px;
+    font-size: 22px;
+  }
+
+  .btn:active {
+    opacity: 0.75;
+  }
+
+  .sncf-link:active,
+  .donate-row a:active {
+    opacity: 0.75;
+  }
 }

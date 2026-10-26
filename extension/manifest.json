@@ -42,9 +42,6 @@
         "required": [
           "none"
         ]
-      },
-      "android": {
-        "strict_max_version": "79.0"
       }
     }
   }
