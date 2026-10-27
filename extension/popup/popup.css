@@ -499,15 +499,29 @@ input[type="date"]:focus {
   color: #0066cc;
 }
 
-/* Header menu (hamburger button + dropdown) */
+/* Header menu (hamburger button + dropdown). The header is a flex row
+   (same layout as the touch media block below): the title centers in
+   the space left of the button, so it never runs under the button on
+   the right. */
 .popup-header {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #0066cc;
+  margin-bottom: 16px;
+}
+
+.popup-header h1 {
+  flex: 1;
+  margin: 0;
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .menu-btn {
-  position: absolute;
-  top: 0;
-  right: 0;
+  position: static;
   width: 28px;
   height: 28px;
   display: inline-flex;
@@ -697,29 +711,8 @@ select {
     width: 100%;
   }
 
-  /* The hamburger is an absolutely pinned 36px box on desktop sizing;
-     on touch, make the header a centered flex row so the button and
-     the title text align on the same line. */
-  .popup-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #0066cc;
-    margin-bottom: 16px;
-  }
-
-  .popup-header h1 {
-    flex: 1;
-    margin: 0;
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-
-  .menu-btn {
-    position: static;
-  }
-
+  /* The header is already a centered flex row (see above); on touch
+     only the control sizes grow. */
   .menu-panel {
     top: 48px;
   }

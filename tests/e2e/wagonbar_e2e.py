@@ -995,6 +995,23 @@ def popup_tests(s):
         check("popup: remove-expired hides itself when nothing is expired",
               btn["hidden"] is True, btn)
 
+        # ---- header: the centered title must not run under the menu button ----
+        title_geo = json.loads(s.page_js(
+            "var h = document.querySelector('#view-main h1');"
+            "var r = document.createRange(); r.selectNodeContents(h);"
+            "var tr = r.getBoundingClientRect(),"
+            "    br = document.getElementById('menuBtn').getBoundingClientRect();"
+            "return JSON.stringify({titleRight: tr.right, btnLeft: br.left,"
+            " titleTop: tr.top, titleBottom: tr.bottom,"
+            " btnTop: br.top, btnBottom: br.bottom,"
+            " lineCount: r.getClientRects().length,"
+            " h1Width: h.getBoundingClientRect().width});"))
+        check("header: the title stays on one line, clear of the menu button",
+              title_geo["titleBottom"] > title_geo["btnTop"]
+              and title_geo["titleRight"] <= title_geo["btnLeft"] + 0.5
+              and (title_geo["titleBottom"] - title_geo["titleTop"]) < 35,
+              title_geo)
+
         # ---- menu: Settings / Help / About views ----
         def view_state():
             return json.loads(s.page_js(
@@ -1019,9 +1036,9 @@ def popup_tests(s):
             "return JSON.stringify({hidden: m.hidden,"
             " entries: Array.from(m.querySelectorAll('button')).map(function(b)"
             "  {return b.textContent.replace(/\\s+/g, ' ').trim();})});"))
-        check("menu: hamburger opens a menu with Settings/Help/About",
+        check("menu: hamburger opens a menu with Settings/Help/Changelog/About",
               menu["hidden"] is False
-              and menu["entries"] == ["Settings", "Help", "About"], menu)
+              and menu["entries"] == ["Settings", "Help", "Changelog", "About"], menu)
 
         s.page_js("document.getElementById('menuSettings').click(); return 'ok';")
         time.sleep(0.3)
@@ -1127,6 +1144,23 @@ def popup_tests(s):
                            "Notifications", "Sync across devices",
                            "Privacy"], headings)
 
+        s.page_js("document.querySelector('#view-help .back-btn').click(); return 'ok';")
+        s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
+        s.page_js("document.getElementById('menuChangelog').click(); return 'ok';")
+        time.sleep(0.3)
+        cl = json.loads(s.page_js(
+            "return JSON.stringify({"
+            " hidden: document.getElementById('view-changelog').hidden,"
+            " versions: Array.from(document.querySelectorAll('#changelogContent h2'))"
+            "  .map(function(h){return h.textContent;}),"
+            " top: document.querySelector('#changelogContent ul li').textContent});"))
+        check("menu: Changelog lists the version history",
+              cl["hidden"] is False
+              and cl["versions"] == ["1.7", "1.6", "1.5", "1.4", "1.3",
+                                     "1.0 \u2013 1.2"]
+              and "Changelog view" in cl["top"], cl)
+        s.page_js("document.querySelector('#view-changelog .back-btn').click(); return 'ok';")
+
         # language switch to French, from the Settings view
         s.page_js("document.querySelector('#view-help .back-btn').click(); return 'ok';")
         s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
@@ -1150,6 +1184,17 @@ def popup_tests(s):
               fr["h1"] == "wagonBar \u2014 Bons SNCF"
               and fr["empty"] == "Aucun bon pour l\u2019instant. Ajoutez-en un ci-dessus !"
               and fr["removeExpired"]["hidden"] is True, fr)
+
+        s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
+        time.sleep(0.3)
+        fr_menu = json.loads(s.page_js(
+            "var m = document.getElementById('menuPanel');"
+            "return JSON.stringify(Array.from(m.querySelectorAll('button'))"
+            ".map(function(b){return b.textContent.replace(/\\s+/g, ' ').trim();}));"))
+        check("menu: French menu labels include Nouveaut\u00e9s",
+              fr_menu == ["Param\u00e8tres", "Aide", "Nouveaut\u00e9s",
+                          "\u00c0 propos"], fr_menu)
+        s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
 
         # ---- SNCF site arrival notification (tabs/notifications are
         # mocked by the test-page shim) ----

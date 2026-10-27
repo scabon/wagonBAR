@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const leadDaysGroup = document.getElementById('leadDaysGroup');
   const leadDaysInput = document.getElementById('leadDaysInput');
   const helpContent = document.getElementById('helpContent');
+  const changelogContent = document.getElementById('changelogContent');
   const aboutContent = document.getElementById('aboutContent');
 
   // Voucher currently being edited in the form, null when adding
@@ -48,6 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
       menuBtn: 'Menu',
       menuSettings: 'Settings',
       menuHelp: 'Help',
+      menuChangelog: 'Changelog',
       menuAbout: 'About',
       addVoucherTitle: 'Add New Voucher',
       addToggleTitle: 'Add a voucher',
@@ -126,6 +128,31 @@ document.addEventListener('DOMContentLoaded', function() {
           text: 'wagonBar stores everything locally in your browser. It requests no network access and sends nothing anywhere.',
           items: [] }
       ],
+      changelogEntries: [
+        { version: '1.7',
+          items: ['New Changelog view in the popup menu, listing the changes of every release.',
+                  'The popup title no longer runs under the menu button.'] },
+        { version: '1.6',
+          items: ['Runs on Firefox for Android, with a touch-friendly full-width popup.',
+                  'Disabled calendar days are clearly dimmed.'] },
+        { version: '1.5',
+          items: ['New wagonBar icons.',
+                  'Notification when you open SNCF Connect with a valid voucher, showing the days left.',
+                  'Expiry reminders: configurable lead time, richer actions and a "Remind me tomorrow" snooze.',
+                  'Fixed expiry notifications never firing on Firefox.',
+                  'Optional voucher value in euros, with a total and a sort-by-value option.',
+                  'One-click SNCF Connect link above the list, shown only when a voucher is usable.',
+                  'The add form collapses behind a + button and a half-filled form is kept when the popup reopens.'] },
+        { version: '1.4',
+          items: ['Vouchers sync across devices through your browser account.',
+                  'Runs on Chrome/Chromium-based browsers.',
+                  'Expiry reminder lead time setting, list sorting, past dates rejected.'] },
+        { version: '1.3',
+          items: ['Voucher management moved into the popup (no more content scripts).',
+                  'ISO date entry with auto-dashes, dark theme, edit and delete, remove expired.'] },
+        { version: '1.0 – 1.2',
+          items: ['First releases: SNCF voucher reminders with expiry notifications.'] }
+      ],
       aboutTagline: 'A small reminder for your SNCF Connect vouchers.',
       aboutNote: 'Not affiliated with SNCF. Your vouchers stay in your own browser.',
       madeBy: 'Made by:',
@@ -141,6 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
       menuBtn: 'Menu',
       menuSettings: 'Param\u00e8tres',
       menuHelp: 'Aide',
+      menuChangelog: 'Nouveautés',
       menuAbout: '\u00c0 propos',
       addVoucherTitle: 'Ajouter un bon',
       addToggleTitle: 'Ajouter un bon',
@@ -218,6 +246,31 @@ document.addEventListener('DOMContentLoaded', function() {
         { title: 'Confidentialit\u00e9',
           text: 'wagonBar stocke tout localement dans votre navigateur. Il n\u2019acc\u00e8de \u00e0 aucun r\u00e9seau et n\u2019envoie rien nulle part.',
           items: [] }
+      ],
+      changelogEntries: [
+        { version: '1.7',
+          items: ['Nouvelle vue « Nouveautés » dans le menu, listant les changements de chaque version.',
+                  'Le titre du popup ne passe plus sous le bouton de menu.'] },
+        { version: '1.6',
+          items: ['Fonctionne sur Firefox pour Android, avec un popup plein écran adapté au tactile.',
+                  'Les jours de calendrier désactivés sont clairement atténués.'] },
+        { version: '1.5',
+          items: ['Nouvelles icônes wagonBar.',
+                  'Notification à l’ouverture de SNCF Connect avec un bon valide, indiquant les jours restants.',
+                  'Rappels d’expiration : délai configurable, actions enrichies et report « Me le rappeler demain ».',
+                  'Corrigé : les notifications d’expiration ne se déclenchaient jamais sur Firefox.',
+                  'Valeur facultative du bon en euros, avec total et tri par valeur.',
+                  'Lien SNCF Connect en un clic au-dessus de la liste, affiché seulement si un bon est utilisable.',
+                  'Le formulaire d’ajout se replie derrière un bouton + et une saisie en cours est conservée à la réouverture du popup.'] },
+        { version: '1.4',
+          items: ['Synchronisation des bons entre appareils via le compte du navigateur.',
+                  'Fonctionne sur Chrome et navigateurs basés sur Chromium.',
+                  'Réglage du délai de rappel d’expiration, tri de la liste, dates passées refusées.'] },
+        { version: '1.3',
+          items: ['Gestion des bons déplacée dans le popup (fin des content scripts).',
+                  'Saisie de date ISO avec tirets automatiques, thème sombre, modifier et supprimer, suppression des expirés.'] },
+        { version: '1.0 – 1.2',
+          items: ['Premières versions : rappels de bons SNCF avec notifications d’expiration.'] }
       ],
       aboutTagline: 'Un petit rappel pour vos bons SNCF Connect.',
       aboutNote: 'Non affili\u00e9 \u00e0 la SNCF. Vos bons restent dans votre navigateur.',
@@ -301,6 +354,7 @@ document.addEventListener('DOMContentLoaded', function() {
     currentLang = resolveLanguage(settings.language);
     applyI18n();
     buildHelpContent();
+    buildChangelogContent();
     buildAboutContent();
     // Dynamic labels and any rendered vouchers must follow the language
     submitBtn.textContent = editingId ? t('updateVoucher') : t('addVoucher');
@@ -366,7 +420,8 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // ---------------------------------------------------------------- views
-  const VIEWS = ['view-main', 'view-settings', 'view-help', 'view-about'];
+  const VIEWS = ['view-main', 'view-settings', 'view-help', 'view-changelog',
+                 'view-about'];
 
   function showView(id) {
     VIEWS.forEach(function(view) {
@@ -426,6 +481,25 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
     helpContent.replaceChildren(frag);
+  }
+
+  function buildChangelogContent() {
+    const frag = document.createDocumentFragment();
+    t('changelogEntries').forEach(function(entry) {
+      const h = document.createElement('h2');
+      h.textContent = entry.version;
+      frag.appendChild(h);
+      if (entry.items && entry.items.length) {
+        const ul = document.createElement('ul');
+        entry.items.forEach(function(item) {
+          const li = document.createElement('li');
+          li.textContent = item;
+          ul.appendChild(li);
+        });
+        frag.appendChild(ul);
+      }
+    });
+    changelogContent.replaceChildren(frag);
   }
 
   function buildAboutContent() {

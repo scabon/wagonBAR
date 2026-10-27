@@ -31,6 +31,13 @@
           </svg>
           <span data-i18n="menuHelp">Help</span>
         </button>
+        <button type="button" id="menuChangelog">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+            <rect x="2.5" y="1.5" width="11" height="13" rx="1.5"></rect>
+            <path d="M5 5h6M5 8h6M5 11h4"></path>
+          </svg>
+          <span data-i18n="menuChangelog">Changelog</span>
+        </button>
         <button type="button" id="menuAbout">
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
             <circle cx="8" cy="8" r="6.5"></circle>
@@ -158,6 +165,14 @@
       <h1 data-i18n="menuHelp">Help</h1>
     </div>
     <div class="section help-text" id="helpContent"></div>
+  </div>
+
+  <div class="container" id="view-changelog" hidden>
+    <div class="back-row">
+      <button type="button" class="back-btn" data-back data-i18n-title="back" title="Back">&#8592;</button>
+      <h1 data-i18n="menuChangelog">Changelog</h1>
+    </div>
+    <div class="section help-text" id="changelogContent"></div>
   </div>
 
   <div class="container" id="view-about" hidden>
