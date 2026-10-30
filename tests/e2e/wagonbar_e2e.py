@@ -112,10 +112,15 @@ class Session:
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, "storage.js"), "w", encoding="utf-8") as fh:
                 fh.write(json.dumps({"vouchers": seed_vouchers}))
+        # Firefox >= 138 gates Marionette system access (chrome context)
+        # behind the MOZ_REMOTE_ALLOW_SYSTEM_ACCESS env var; the
+        # -remote-allow-system-access flag alone stopped working on
+        # Firefox 160 (kept for older engines)
         self.proc = subprocess.Popen(
             [FIREFOX_BIN, "-marionette", "-headless", "-no-remote",
              "-profile", self.profile, "-remote-allow-system-access"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            env=dict(os.environ, MOZ_REMOTE_ALLOW_SYSTEM_ACCESS="1"))
         from marionette_driver.marionette import Marionette
         from marionette_driver.addons import Addons
         self.client = None
@@ -1104,14 +1109,17 @@ def popup_tests(s):
             " madeBy: c.querySelector('.about-site').parentElement.textContent.trim(),"
             " links: Array.from(c.querySelectorAll('a')).map(function(a)"
             "  {return [a.className, a.href];})});"))
-        # no browser.runtime in the test page, so the version stays empty.
+        # runtime has no getManifest in the test page, so the version stays
+        # empty; getBrowserInfo IS exposed (Firefox surface), so the rating
+        # link resolves to the AMO URL.
         # Tipeee serves a French UI on fr.tipeee.com and an English one on
         # en.tipeee.com (same campaign): the English popup gets the EN link
-        check("menu: About shows wagonBar and the EU donation links",
+        check("menu: About shows wagonBar, the store rating link and the EU donation links",
               about["name"] == "wagonBar" and about["version"] == ""
               and about["madeBy"] == "Made by: cabon14.com"
               and about["links"] == [["about-site", "https://cabon14.com/"],
                                     ["about-site", "mailto:support@cabon14.com"],
+                                    ["rate-store", "https://addons.mozilla.org/addon/wagonbar/"],
                                     ["donate-liberapay", "https://liberapay.com/cabon14/"],
                                     ["donate-tipeee", "https://en.tipeee.com/cabon14/"]],
               about)

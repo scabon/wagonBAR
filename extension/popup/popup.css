@@ -12,6 +12,8 @@
   --scrollbar-thumb: #ccc;
   --empty-message-color: #666;
   --stats-color: #666;
+  --accent: #0066cc;
+  --ok: #1e7e34;
 }
 
 /* Dark theme. popup.js resolves the "system" theme setting through
@@ -28,8 +30,10 @@
   --shadow-color: rgba(0,0,0,0.3);
   --scrollbar-track: #2d2d2d;
   --scrollbar-thumb: #555;
-  --empty-message-color: #777;
+  --empty-message-color: #999;
   --stats-color: #999;
+  --accent: #66b3ff;
+  --ok: #4cd964;
 }
 
 body {
@@ -55,9 +59,9 @@ body {
 h1 {
   font-size: 18px;
   margin: 0 0 16px 0;
-  color: #0066cc;
+  color: var(--accent);
   text-align: center;
-  border-bottom: 2px solid #0066cc;
+  border-bottom: 2px solid var(--accent);
   padding-bottom: 8px;
 }
 
@@ -111,7 +115,7 @@ input[type="text"]:focus,
 input[type="number"]:focus,
 input[type="date"]:focus {
   outline: none;
-  border-color: #0066cc;
+  border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
 }
 
@@ -144,8 +148,8 @@ input[type="date"]:focus {
 }
 
 .calendar-btn:hover {
-  border-color: #0066cc;
-  color: #0066cc;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Custom calendar widget (the native date picker cannot open
@@ -183,7 +187,7 @@ input[type="date"]:focus {
 
 .calendar-nav:hover {
   background: var(--scrollbar-track);
-  color: #0066cc;
+  color: var(--accent);
 }
 
 .calendar-grid {
@@ -216,7 +220,7 @@ input[type="date"]:focus {
 
 .calendar-day.today {
   font-weight: 600;
-  color: #0066cc;
+  color: var(--accent);
 }
 
 .calendar-day.today:hover {
@@ -247,6 +251,12 @@ input[type="date"]:focus {
   font-size: 14px;
   cursor: pointer;
   transition: background-color 0.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
 }
 
 .btn-primary {
@@ -283,7 +293,7 @@ input[type="date"]:focus {
 
 .voucher-item .code {
   font-weight: 600;
-  color: #0066cc;
+  color: var(--accent);
   font-family: monospace;
 }
 
@@ -295,11 +305,11 @@ input[type="date"]:focus {
 .voucher-item .amount {
   font-size: 12px;
   font-weight: 600;
-  color: #28a745;
+  color: var(--ok);
 }
 
 .voucher-item.valid {
-  border-left: 3px solid #28a745;
+  border-left: 3px solid var(--ok);
 }
 
 .voucher-item.expired {
@@ -332,7 +342,7 @@ input[type="date"]:focus {
 
 .stats span {
   font-weight: 600;
-  color: #0066cc;
+  color: var(--accent);
 }
 
 /* One-click jump to the SNCF Connect site to use the vouchers */
@@ -392,8 +402,8 @@ input[type="date"]:focus {
 }
 
 .add-toggle:hover {
-  border-color: #0066cc;
-  color: #0066cc;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Remove-expired bulk action next to the sort control */
@@ -495,8 +505,8 @@ input[type="date"]:focus {
 }
 
 .btn-secondary:hover {
-  border-color: #0066cc;
-  color: #0066cc;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Header menu (hamburger button + dropdown). The header is a flex row
@@ -509,7 +519,7 @@ input[type="date"]:focus {
   align-items: center;
   gap: 8px;
   padding-bottom: 8px;
-  border-bottom: 2px solid #0066cc;
+  border-bottom: 2px solid var(--accent);
   margin-bottom: 16px;
 }
 
@@ -536,8 +546,8 @@ input[type="date"]:focus {
 
 .menu-btn:hover,
 .menu-btn.open {
-  border-color: #0066cc;
-  color: #0066cc;
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .menu-panel {
@@ -580,7 +590,7 @@ input[type="date"]:focus {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 2px solid #0066cc;
+  border-bottom: 2px solid var(--accent);
   margin-bottom: 16px;
 }
 
@@ -590,7 +600,7 @@ input[type="date"]:focus {
   padding: 0 4px;
   font-size: 18px;
   line-height: 1;
-  color: #0066cc;
+  color: var(--accent);
   cursor: pointer;
 }
 
@@ -645,7 +655,7 @@ select {
 .about-name {
   font-size: 16px;
   font-weight: 600;
-  color: #0066cc;
+  color: var(--accent);
 }
 
 .about-version {
@@ -660,13 +670,15 @@ select {
   color: var(--label-color);
 }
 
-.about-site {
+.about-site,
+.rate-store {
   font-size: 13px;
-  color: #0066cc;
+  color: var(--accent);
   text-decoration: none;
 }
 
-.about-site:hover {
+.about-site:hover,
+.rate-store:hover {
   text-decoration: underline;
 }
 

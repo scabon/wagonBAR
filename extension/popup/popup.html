@@ -10,20 +10,20 @@
   <div class="container" id="view-main">
     <div class="popup-header">
       <h1><img src="../icons/icon-48.png" alt="" aria-hidden="true"><span data-i18n="appTitle">wagonBar — SNCF Vouchers</span></h1>
-      <button type="button" id="menuBtn" class="menu-btn" aria-haspopup="menu" data-i18n-title="menuBtn" title="Menu">
+      <button type="button" id="menuBtn" class="menu-btn" aria-haspopup="menu" aria-expanded="false" data-i18n-label="menuBtn" aria-label="Menu" data-i18n-title="menuBtn" title="Menu">
         <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
           <path d="M2 4h12M2 8h12M2 12h12"></path>
         </svg>
       </button>
-      <div id="menuPanel" class="menu-panel" hidden>
-        <button type="button" id="menuSettings">
+      <div id="menuPanel" class="menu-panel" role="menu" data-i18n-label="menuBtn" aria-label="Menu" hidden>
+        <button type="button" id="menuSettings" role="menuitem">
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
             <path d="M6.8 1.5h2.4l.36 1.7a5.5 5.5 0 0 1 1.4.8l1.66-.55 1.2 2.08-1.3 1.15a5.6 5.6 0 0 1 0 1.64l1.3 1.15-1.2 2.08-1.66-.55a5.5 5.5 0 0 1-1.4.8l-.36 1.7H6.8l-.36-1.7a5.5 5.5 0 0 1-1.4-.8l-1.66.55-1.2-2.08 1.3-1.15a5.6 5.6 0 0 1 0-1.64L2.18 5.53l1.2-2.08 1.66.55a5.5 5.5 0 0 1 1.4-.8z"></path>
             <circle cx="8" cy="8" r="2.2"></circle>
           </svg>
           <span data-i18n="menuSettings">Settings</span>
         </button>
-        <button type="button" id="menuHelp">
+        <button type="button" id="menuHelp" role="menuitem">
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
             <circle cx="8" cy="8" r="6.5"></circle>
             <path d="M6.2 6.2a1.9 1.9 0 1 1 2.7 1.7c-.6.3-.9.6-.9 1.2"></path>
@@ -31,14 +31,14 @@
           </svg>
           <span data-i18n="menuHelp">Help</span>
         </button>
-        <button type="button" id="menuChangelog">
+        <button type="button" id="menuChangelog" role="menuitem">
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
             <rect x="2.5" y="1.5" width="11" height="13" rx="1.5"></rect>
             <path d="M5 5h6M5 8h6M5 11h4"></path>
           </svg>
           <span data-i18n="menuChangelog">Changelog</span>
         </button>
-        <button type="button" id="menuAbout">
+        <button type="button" id="menuAbout" role="menuitem">
           <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
             <circle cx="8" cy="8" r="6.5"></circle>
             <path d="M8 7.2v3.8"></path>
@@ -77,7 +77,7 @@
               </svg>
             </button>
           </div>
-          <div id="calendarPanel" class="calendar-panel" hidden></div>
+          <div id="calendarPanel" class="calendar-panel" role="group" data-i18n-label="calendarTitle" aria-label="Pick a date" hidden></div>
         </div>
         <div class="form-actions">
           <button type="submit" class="btn btn-primary" id="submitBtn" data-i18n="addVoucher">Add Voucher</button>
@@ -85,7 +85,7 @@
         </div>
       </form>
       <div class="status-slot">
-        <div id="statusMessage" class="status-message" data-i18n-title="dismissHint" title="Click to dismiss" hidden></div>
+        <div id="statusMessage" class="status-message" role="status" aria-live="polite" data-i18n-title="dismissHint" title="Click to dismiss" hidden></div>
       </div>
     </div>
 
@@ -96,7 +96,7 @@
         <h2 data-i18n="yourVouchers">Your Vouchers</h2>
         <div class="list-controls">
           <button type="button" id="removeExpiredBtn" class="btn btn-danger remove-expired-btn" data-i18n="removeExpired" hidden>Remove expired</button>
-          <select id="sortOrder" data-i18n-title="sortOrder" title="Sort order">
+          <select id="sortOrder" data-i18n-label="sortOrder" aria-label="Sort order" data-i18n-title="sortOrder" title="Sort order">
             <option value="date" data-i18n="sortByDate">By date</option>
             <option value="code" data-i18n="sortByCode">By code</option>
             <option value="value" data-i18n="sortByValue">By value</option>

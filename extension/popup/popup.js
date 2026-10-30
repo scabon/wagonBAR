@@ -161,7 +161,9 @@ document.addEventListener('DOMContentLoaded', function() {
       supportEmail: 'support@cabon14.com',
       donateTitle: 'Support wagonBar',
       donateLiberapay: 'Donate on Liberapay',
-      donateTipeee: 'Tip on Tipeee'
+      donateTipeee: 'Tip on Tipeee',
+      rateExtension: 'Rate this extension',
+      expiredBadge: 'expired'
     },
     fr: {
       appTitle: 'wagonBar \u2014 Bons SNCF',
@@ -280,7 +282,9 @@ document.addEventListener('DOMContentLoaded', function() {
       supportEmail: 'support@cabon14.com',
       donateTitle: 'Soutenir wagonBar',
       donateLiberapay: 'Soutenir sur Liberapay',
-      donateTipeee: 'Pourboire sur Tipeee'
+      donateTipeee: 'Pourboire sur Tipeee',
+      rateExtension: 'Noter l\u2019extension',
+      expiredBadge: 'expir\u00e9'
     }
   };
 
@@ -290,6 +294,20 @@ document.addEventListener('DOMContentLoaded', function() {
   // en.tipeee.com (same campaign) — pick per popup language.
   const DONATION_TIPEEE_FR = 'https://fr.tipeee.com/cabon14/';
   const DONATION_TIPEEE_EN = 'https://en.tipeee.com/cabon14/';
+
+  // Store listing pages, where the user can rate the extension. Firefox
+  // gets the AMO page (runtime.getBrowserInfo is Firefox-only); Chromium
+  // gets the Edge Add-ons page when the UA says Edge, else the Chrome Web
+  // Store listing.
+  const STORE_URL_FIREFOX = 'https://addons.mozilla.org/addon/wagonbar/';
+  const STORE_URL_CHROME = 'https://chromewebstore.google.com/detail/wagonbar/ccfbilijaieheadekfokopnjomleneka';
+  const STORE_URL_EDGE = 'https://microsoftedge.microsoft.com/addons/detail/kbjkmnahogbpfipgfbdimnmpfcbdpgbh';
+
+  function storeRatingUrl() {
+    if (browser.runtime && browser.runtime.getBrowserInfo) return STORE_URL_FIREFOX;
+    if (/Edg\//.test(navigator.userAgent || '')) return STORE_URL_EDGE;
+    return STORE_URL_CHROME;
+  }
 
   let currentLang = 'en';
 
@@ -427,16 +445,28 @@ document.addEventListener('DOMContentLoaded', function() {
     VIEWS.forEach(function(view) {
       document.getElementById(view).hidden = (view !== id);
     });
+    // Move focus into the shown view: on a sub-view the back button,
+    // on the main view the menu button (keyboard users must not be
+    // left on a control that just became hidden)
+    const target = id === 'view-main' ? menuBtn
+                   : document.getElementById(id).querySelector('.back-btn');
+    if (target) target.focus();
   }
 
   function openMenu() {
     menuPanel.hidden = false;
     menuBtn.classList.add('open');
+    menuBtn.setAttribute('aria-expanded', 'true');
+    const first = menuPanel.querySelector('button');
+    if (first) first.focus();
   }
 
   function closeMenu() {
+    const hadFocus = menuPanel.contains(document.activeElement);
     menuPanel.hidden = true;
     menuBtn.classList.remove('open');
+    menuBtn.setAttribute('aria-expanded', 'false');
+    if (hadFocus) menuBtn.focus();
   }
 
   menuBtn.addEventListener('click', function(e) {
@@ -537,6 +567,15 @@ document.addEventListener('DOMContentLoaded', function() {
     supportLine.appendChild(document.createTextNode(' '));
     supportLine.appendChild(support);
 
+    const rate = document.createElement('a');
+    rate.href = storeRatingUrl();
+    rate.target = '_blank';
+    rate.rel = 'noopener noreferrer';
+    rate.className = 'rate-store';
+    rate.textContent = t('rateExtension');
+    const rateLine = buildNode('p', 'about-rate');
+    rateLine.appendChild(rate);
+
     const donateTitle = buildNode('h2', '', t('donateTitle'));
     const liberapay = document.createElement('a');
     liberapay.href = DONATION_LIBERAPAY;
@@ -555,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
     donateRow.appendChild(tipeee);
 
     aboutContent.replaceChildren(name, versionNode, tagline, note,
-                                 siteLine, supportLine,
+                                 siteLine, supportLine, rateLine,
                                  donateTitle, donateRow);
   }
 
@@ -905,7 +944,9 @@ document.addEventListener('DOMContentLoaded', function() {
     prevBtn.type = 'button';
     nextBtn.type = 'button';
     prevBtn.title = t('prevMonth');
+    prevBtn.setAttribute('aria-label', t('prevMonth'));
     nextBtn.title = t('nextMonth');
+    nextBtn.setAttribute('aria-label', t('nextMonth'));
     const title = buildNode('span', 'calendar-title',
                             t('months')[viewMonth] + ' ' + viewYear);
     header.appendChild(prevBtn);
@@ -933,6 +974,8 @@ document.addEventListener('DOMContentLoaded', function() {
       const dayBtn = buildNode('button', 'calendar-day', String(day));
       dayBtn.type = 'button';
       dayBtn.dataset.date = iso;
+      dayBtn.setAttribute('aria-label',
+        day + ' ' + t('months')[viewMonth] + ' ' + viewYear);
       if (iso === selected) dayBtn.classList.add('selected');
       if (iso === todayISO) dayBtn.classList.add('today');
       // Past days cannot be picked (a voucher expiring today is allowed)
@@ -960,6 +1003,18 @@ document.addEventListener('DOMContentLoaded', function() {
       updateGhost();
       saveDraft(); // programmatic value change fires no input event
       closeCalendar();
+      calendarBtn.focus();
+    });
+    // Arrow keys move between the enabled days of the month grid
+    grid.addEventListener('keydown', function(e) {
+      const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+      if (!step) return;
+      const cur = e.target.closest('.calendar-day');
+      if (!cur) return;
+      e.preventDefault();
+      const days = Array.from(grid.querySelectorAll('.calendar-day:not(:disabled)'));
+      const next = days[days.indexOf(cur) + step];
+      if (next) next.focus();
     });
   }
 
@@ -1006,6 +1061,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.key === 'Escape') {
       closeCalendar();
       closeMenu();
+      // Escape on a sub-view also goes back to the main view
+      const visible = VIEWS.find(function(v) {
+        return !document.getElementById(v).hidden;
+      });
+      if (visible && visible !== 'view-main') showView('view-main');
     }
   });
 
@@ -1067,7 +1127,8 @@ document.addEventListener('DOMContentLoaded', function() {
         info.appendChild(buildNode('div', 'amount',
                                   formatAmount(voucher.amount)));
       }
-      info.appendChild(buildNode('div', 'expiry', t('expiresPrefix') + formatDate(expiryDate)));
+      info.appendChild(buildNode('div', 'expiry', t('expiresPrefix') + formatDate(expiryDate) +
+                                  (isValid ? '' : ' (' + t('expiredBadge') + ')')));
 
       const editBtn = buildNode('button', 'btn btn-secondary edit-btn', t('edit'));
       editBtn.dataset.id = voucher.id;
