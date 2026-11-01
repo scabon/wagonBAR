@@ -17,6 +17,7 @@ When releasing a new version:
 ## [1.7.1] — 2026-11-01
 
 - Export your vouchers to a JSON file (backup) and import them back — Settings → Export / Import. Exports carry the SNCF Connect site, so they also import as-is into bandWagon.
+- Fixed: the import file picker did not open on Firefox (hidden file input; now rendered off-screen).
 
 ## [1.7] — 2026-10-27
 

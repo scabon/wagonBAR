@@ -515,6 +515,14 @@ def io_tests(s, url):
     s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
     s.page_js("document.getElementById('menuSettings').click(); return 'ok';")
     time.sleep(0.3)
+    # Firefox only opens the file picker for a RENDERED input (hidden makes
+    # importBtn.click() a silent no-op) — check while the Settings view is visible
+    fi = json.loads(s.page_js(
+        "var i = document.getElementById('importFileInput');"
+        "return JSON.stringify({rendered: !!(i && i.offsetParent !== null),"
+        " hidden: i.hidden});"))
+    check("io: the import file input is rendered (Firefox picker needs a visible input)",
+          fi["rendered"] is True and fi["hidden"] is False, fi)
     s.page_js("document.getElementById('exportBtn').click(); return 'ok';")
     time.sleep(0.6)
     exp = json.loads(s.page_js(

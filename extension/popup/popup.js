@@ -133,7 +133,8 @@ document.addEventListener('DOMContentLoaded', function() {
       ],
       changelogEntries: [
                 { version: '1.7.1',
-          items: ['Export your vouchers to a JSON file (backup) and import them back — Settings → Export / Import. Exports carry the SNCF Connect site, so they also import as-is into bandWagon.'] },
+          items: ['Export your vouchers to a JSON file (backup) and import them back — Settings → Export / Import. Exports carry the SNCF Connect site, so they also import as-is into bandWagon.',
+                  'Fixed: the import file picker did not open on Firefox (hidden file input; now rendered off-screen).'] },
 { version: '1.7',
           items: ['New Changelog view in the popup menu, listing the changes of every release.',
                   'The popup title no longer runs under the menu button.'] },
@@ -266,7 +267,8 @@ document.addEventListener('DOMContentLoaded', function() {
       ],
       changelogEntries: [
                 { version: '1.7.1',
-          items: ['Exportez vos bons dans un fichier JSON (sauvegarde) et r\u00e9importez-les \u2014 Param\u00e8tres \u2192 Exporter / Importer. Les exports portent le site SNCF Connect, donc ils s\u2019importent tels quels dans bandWagon.'] },
+          items: ['Exportez vos bons dans un fichier JSON (sauvegarde) et r\u00e9importez-les \u2014 Param\u00e8tres \u2192 Exporter / Importer. Les exports portent le site SNCF Connect, donc ils s\u2019importent tels quels dans bandWagon.',
+                  'Corrig\u00e9 : le s\u00e9lecteur de fichier de l\u2019import ne s\u2019ouvrait pas sur Firefox (input cach\u00e9 ; rendu hors \u00e9cran maintenant).'] },
 { version: '1.7',
           items: ['Nouvelle vue « Nouveautés » dans le menu, listant les changements de chaque version.',
                   'Le titre du popup ne passe plus sous le bouton de menu.'] },
