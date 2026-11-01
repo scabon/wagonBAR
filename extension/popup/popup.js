@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const helpContent = document.getElementById('helpContent');
   const changelogContent = document.getElementById('changelogContent');
   const aboutContent = document.getElementById('aboutContent');
+  const exportBtn = document.getElementById('exportBtn');
+  const importBtn = document.getElementById('importBtn');
+  const importFileInput = document.getElementById('importFileInput');
 
   // Voucher currently being edited in the form, null when adding
   let editingId = null;
@@ -129,7 +132,9 @@ document.addEventListener('DOMContentLoaded', function() {
           items: [] }
       ],
       changelogEntries: [
-        { version: '1.7',
+                { version: '1.7.1',
+          items: ['Export your vouchers to a JSON file (backup) and import them back — Settings → Export / Import. Exports carry the SNCF Connect site, so they also import as-is into bandWagon.'] },
+{ version: '1.7',
           items: ['New Changelog view in the popup menu, listing the changes of every release.',
                   'The popup title no longer runs under the menu button.'] },
         { version: '1.6',
@@ -163,7 +168,17 @@ document.addEventListener('DOMContentLoaded', function() {
       donateLiberapay: 'Donate on Liberapay',
       donateTipeee: 'Tip on Tipeee',
       rateExtension: 'Rate this extension',
-      expiredBadge: 'expired'
+      expiredBadge: 'expired',
+      settingsData: 'Data',
+      settingsDataHint: 'Export your vouchers to a JSON file (backup), or import a previously exported file',
+      exportVouchers: 'Export (JSON)',
+      importVouchers: 'Import (JSON)',
+      exportDone: '{n} vouchers exported.',
+      importDone: '{n} vouchers imported.',
+      importDup: '{n} duplicate(s) skipped.',
+      importAllDup: 'All {n} vouchers are already in your list.',
+      importErrFile: 'This file is not a valid JSON voucher export.',
+      importErrSchema: 'No valid voucher found in this file (a code and a valid expiration date are required).'
     },
     fr: {
       appTitle: 'wagonBar \u2014 Bons SNCF',
@@ -250,7 +265,9 @@ document.addEventListener('DOMContentLoaded', function() {
           items: [] }
       ],
       changelogEntries: [
-        { version: '1.7',
+                { version: '1.7.1',
+          items: ['Exportez vos bons dans un fichier JSON (sauvegarde) et r\u00e9importez-les \u2014 Param\u00e8tres \u2192 Exporter / Importer. Les exports portent le site SNCF Connect, donc ils s\u2019importent tels quels dans bandWagon.'] },
+{ version: '1.7',
           items: ['Nouvelle vue « Nouveautés » dans le menu, listant les changements de chaque version.',
                   'Le titre du popup ne passe plus sous le bouton de menu.'] },
         { version: '1.6',
@@ -284,7 +301,17 @@ document.addEventListener('DOMContentLoaded', function() {
       donateLiberapay: 'Soutenir sur Liberapay',
       donateTipeee: 'Pourboire sur Tipeee',
       rateExtension: 'Noter l\u2019extension',
-      expiredBadge: 'expir\u00e9'
+      expiredBadge: 'expir\u00e9',
+      settingsData: 'Donn\u00e9es',
+      settingsDataHint: 'Exportez vos bons dans un fichier JSON (sauvegarde), ou importez un fichier pr\u00e9c\u00e9demment export\u00e9',
+      exportVouchers: 'Exporter (JSON)',
+      importVouchers: 'Importer (JSON)',
+      exportDone: '{n} bons export\u00e9s.',
+      importDone: '{n} bons import\u00e9s.',
+      importDup: '{n} doublon(s) ignor\u00e9(s).',
+      importAllDup: 'Les {n} bons sont d\u00e9j\u00e0 dans votre liste.',
+      importErrFile: 'Ce fichier n\u2019est pas un export JSON de bons valide.',
+      importErrSchema: 'Aucun bon valide dans ce fichier (un code et une date d\u2019expiration valide sont requis).'
     }
   };
 
@@ -435,6 +462,112 @@ document.addEventListener('DOMContentLoaded', function() {
     if (clamped !== n) leadDaysInput.value = clamped;
     settings.notifyLeadDays = clamped;
     saveSettings();
+  });
+
+  // ------------------------------------------------------- export/import
+  // Export format: {"app":"wagonBAR","formatVersion":1,"exportedAt":...,
+  // "vouchers":[...]}. Each exported voucher also carries the SNCF Connect
+  // site (siteName/siteUrl), so the file imports as-is into bandWagon.
+  // Import accepts that object or a bare array; a voucher needs a code and
+  // a valid expiration date (past dates allowed -> shows as expired).
+  const EXPORT_SITE = { siteName: 'SNCF Connect', siteUrl: 'https://www.sncf-connect.com' };
+  function buildExportJson(vouchers) {
+    return JSON.stringify({
+      app: 'wagonBAR',
+      formatVersion: 1,
+      exportedAt: new Date().toISOString(),
+      vouchers: vouchers.map(function(v) { return Object.assign({}, v, EXPORT_SITE); })
+    }, null, 2);
+  }
+  function normalizeImportedVoucher(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const code = typeof raw.code === 'string' ? raw.code.trim().toUpperCase() : '';
+    if (!code) return null;
+    let expiryDate = null;
+    if (typeof raw.expiryDate === 'string' && raw.expiryDate.trim()) {
+      expiryDate = parseDateInput(raw.expiryDate.trim());
+    }
+    if (!expiryDate) return null;
+    const v = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+      code: code,
+      expiryDate: expiryDate,
+      createdAt: typeof raw.createdAt === 'string' ? raw.createdAt
+                                                   : new Date().toISOString()
+    };
+    if (raw.amount !== undefined && raw.amount !== null && raw.amount !== '') {
+      const a = parseValueInput(String(raw.amount));
+      if (a !== undefined && a !== null) v.amount = a;
+    }
+    return v;
+  }
+  exportBtn.addEventListener('click', function() {
+    browser.storage.local.get('vouchers').then(function(data) {
+      const vouchers = data.vouchers || [];
+      const json = buildExportJson(vouchers);
+      // test hook: the e2e suite reads the export from this attribute
+      document.documentElement.setAttribute('data-e2e-export', json);
+      const blob = new Blob([json], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'wagonbar-vouchers-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+      showStatus(t('exportDone', { n: vouchers.length }), 'success');
+    });
+  });
+  importBtn.addEventListener('click', function() {
+    importFileInput.click();
+  });
+  importFileInput.addEventListener('change', function() {
+    const file = importFileInput.files && importFileInput.files[0];
+    importFileInput.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function() {
+      let data;
+      try { data = JSON.parse(reader.result); } catch (e) {
+        showStatus(t('importErrFile'), 'error');
+        return;
+      }
+      const arr = Array.isArray(data) ? data
+                : (data && Array.isArray(data.vouchers) ? data.vouchers : null);
+      if (!arr) {
+        showStatus(t('importErrFile'), 'error');
+        return;
+      }
+      const imported = arr.map(normalizeImportedVoucher).filter(Boolean);
+      if (!imported.length) {
+        showStatus(t('importErrSchema'), 'error');
+        return;
+      }
+      browser.storage.local.get('vouchers').then(function(d) {
+        const existing = d.vouchers || [];
+        const fresh = [];
+        let dup = 0;
+        imported.forEach(function(v) {
+          const isDup = existing.some(function(e) { return e.code === v.code; }) ||
+                        fresh.some(function(e) { return e.code === v.code; });
+          if (isDup) dup++;
+          else fresh.push(v);
+        });
+        if (!fresh.length) {
+          showStatus(t('importAllDup', { n: dup }), 'warning');
+          return;
+        }
+        const all = existing.concat(fresh);
+        browser.storage.local.set({ vouchers: all }).then(function() {
+          loadVouchers();
+          let msg = t('importDone', { n: fresh.length });
+          if (dup) msg += ' ' + t('importDup', { n: dup });
+          showStatus(msg, 'success');
+          fresh.forEach(function(v) { syncWriteVoucher(v); });
+        });
+      });
+    };
+    reader.readAsText(file);
   });
 
   // ---------------------------------------------------------------- views

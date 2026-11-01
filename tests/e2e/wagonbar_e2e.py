@@ -510,6 +510,71 @@ def popup_add(s, code, date, value=None):
     )
 
 
+def io_tests(s, url):
+    # export the current store
+    s.page_js("document.getElementById('menuBtn').click(); return 'ok';")
+    s.page_js("document.getElementById('menuSettings').click(); return 'ok';")
+    time.sleep(0.3)
+    s.page_js("document.getElementById('exportBtn').click(); return 'ok';")
+    time.sleep(0.6)
+    exp = json.loads(s.page_js(
+        "return JSON.stringify({"
+        " raw: document.documentElement.getAttribute('data-e2e-export') || '',"
+        " status: (function(){var x=document.getElementById('statusMessage');"
+        "          return {hidden:x.hidden, text:x.textContent};})()});"))
+    parsed = json.loads(exp["raw"]) if exp["raw"] else {}
+    st = pstate(s)
+    n = len(st["store"])
+    check("io: export produces the wagonBAR JSON with the SNCF site on each voucher",
+          parsed.get("app") == "wagonBAR" and len(parsed.get("vouchers") or []) == n
+          and all(v.get("siteName") == "SNCF Connect"
+                  and v.get("siteUrl") == "https://www.sncf-connect.com"
+                  for v in parsed.get("vouchers") or []),
+          (parsed.get("app"), len(parsed.get("vouchers") or [])))
+    check("io: export shows a success status",
+          not exp["status"]["hidden"] and "exported" in exp["status"]["text"], exp["status"])
+
+    def import_file(payload_text):
+        s.page_js(
+            "var f = new File([%s], 'import.json', {type: 'application/json'});"
+            "var dt = new DataTransfer(); dt.items.add(f);"
+            "var i = document.getElementById('importFileInput');"
+            "i.files = dt.files; i.dispatchEvent(new Event('change')); return 'ok';"
+            % json.dumps(payload_text))
+        time.sleep(0.8)
+
+    before = len(pstate(s)["store"])
+    payload = {"app": "wagonBAR", "formatVersion": 1, "vouchers": [
+        {"code": "IMPORTED-1", "expiryDate": "2030-05-05", "amount": 12.5},
+        {"code": "imported-2", "expiryDate": "2031-01-01"},
+    ]}
+    import_file(json.dumps(payload))
+    st = pstate(s)
+    codes = [v.get("code") for v in st["store"]]
+    check("io: import adds valid vouchers (code uppercased)",
+          "IMPORTED-1" in codes and "IMPORTED-2" in codes
+          and len(st["store"]) == before + 2, (codes, len(st["store"])))
+    check("io: import reports the imported count",
+          not st["status"]["hidden"] and "2" in st["status"]["text"]
+          and "imported" in st["status"]["text"], st["status"])
+
+    import_file(json.dumps([{"code": "IMPORTED-1", "expiryDate": "2030-05-05"}]))
+    st = pstate(s)
+    check("io: re-importing the same code is a no-op with a warning",
+          len(st["store"]) == before + 2 and "already" in st["status"]["text"],
+          (len(st["store"]), st["status"]))
+
+    import_file("not json at all")
+    st = pstate(s)
+    check("io: a non-JSON file shows an inline error, nothing imported",
+          len(st["store"]) == before + 2 and "not a valid JSON" in st["status"]["text"], st["status"])
+
+    import_file(json.dumps([{"code": "NO-DATE"}]))
+    st = pstate(s)
+    check("io: a voucher without a valid date is rejected (schema error)",
+          len(st["store"]) == before + 2 and "No valid voucher" in st["status"]["text"], st["status"])
+
+
 def popup_tests(s):
     port = 18345
     d, url = build_popup_test_page(port)
@@ -1164,9 +1229,9 @@ def popup_tests(s):
             " top: document.querySelector('#changelogContent ul li').textContent});"))
         check("menu: Changelog lists the version history",
               cl["hidden"] is False
-              and cl["versions"] == ["1.7", "1.6", "1.5", "1.4", "1.3",
+              and cl["versions"] == ["1.7.1", "1.7", "1.6", "1.5", "1.4", "1.3",
                                      "1.0 \u2013 1.2"]
-              and "Changelog view" in cl["top"], cl)
+              and "Export your vouchers" in cl["top"], cl)
         s.page_js("document.querySelector('#view-changelog .back-btn').click(); return 'ok';")
 
         # language switch to French, from the Settings view
@@ -1638,6 +1703,8 @@ def popup_tests(s):
               and tomb.get("by") == st["deviceId"]
               and st["total"] == "1",
               (st["syncStore"], st["total"]))
+
+        io_tests(s, url)
     finally:
         if httpd:
             httpd.shutdown()

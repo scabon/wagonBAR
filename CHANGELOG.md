@@ -14,6 +14,10 @@ When releasing a new version:
 3. bump `"version"` in `extension/manifest.json` to match the new section;
 4. run `python tools/check-changelog.py`.
 
+## [1.7.1] — 2026-11-01
+
+- Export your vouchers to a JSON file (backup) and import them back — Settings → Export / Import. Exports carry the SNCF Connect site, so they also import as-is into bandWagon.
+
 ## [1.7] — 2026-10-27
 
 - New Changelog view in the popup menu, listing the changes of every release.
