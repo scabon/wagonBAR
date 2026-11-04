@@ -607,6 +607,9 @@ def popup_tests(s):
               st["total"] == "0" and st["valid"] == "0"
               and "No vouchers yet" in st["empty"], st["empty"])
 
+        check("popup: search box hidden with an empty list",
+              s.page_js("return document.getElementById('searchInput').hidden;") is True)
+
         icon = json.loads(s.page_js(
             "var im = document.querySelector('h1 img');"
             "return JSON.stringify({present: !!im,"
@@ -676,10 +679,15 @@ def popup_tests(s):
                          "createdAt": "2026-09-29T00:00:00.000Z"}]
         s.client.navigate(url + "?e2e-seed=" + quote(json.dumps(expired_seed)))
         time.sleep(1)
+        check("popup: search box still hidden with a single voucher",
+              s.page_js("return document.getElementById('searchInput').hidden;") is True)
 
         soon = date.today() + timedelta(days=7)
         soon_d = soon.strftime("%Y-%m-%d")
         popup_add(s, "E2E-FUTURE-999", "2028-06-30")
+        time.sleep(0.6)
+        check("popup: search box appears from two vouchers on",
+              s.page_js("return !document.getElementById('searchInput').hidden;") is True)
         popup_add(s, "E2E-SOON-111", soon_d)
         time.sleep(1)
 
@@ -1004,6 +1012,50 @@ def popup_tests(s):
                                "E2E-SOON-111", "E2E-TRIM-1", "GPLI089N3",
                                "TOOLONGCODE"],
               list_codes())
+
+        # search box: live filter by code (case-insensitive) and amount,
+        # no-match message
+        popup_add(s, "E2E-VAL-9", "2030-05-05", "42")
+        time.sleep(0.6)
+
+        s.page_js("var si = document.getElementById('searchInput');"
+                  "si.value = 'trim'; si.dispatchEvent(new Event('input'));"
+                  "return 'ok';")
+        time.sleep(0.3)
+        check("popup: search filters the list by code",
+              list_codes() == ["E2E-TRIM-1"], list_codes())
+
+        s.page_js("var si = document.getElementById('searchInput');"
+                  "si.value = 'gpli';"
+                  "si.dispatchEvent(new Event('input')); return 'ok';")
+        time.sleep(0.3)
+        check("popup: search matches the code case-insensitively",
+              list_codes() == ["GPLI089N3"], list_codes())
+
+        s.page_js("var si = document.getElementById('searchInput');"
+                  "si.value = '42';"
+                  "si.dispatchEvent(new Event('input')); return 'ok';")
+        time.sleep(0.3)
+        st = pstate(s)
+        check("popup: search matches the amount",
+              len(st["items"]) == 1 and "E2E-VAL-9" in st["items"][0]["text"],
+              [i["text"] for i in st["items"]])
+
+        s.page_js("var si = document.getElementById('searchInput');"
+                  "si.value = 'zzz-no-match';"
+                  "si.dispatchEvent(new Event('input')); return 'ok';")
+        time.sleep(0.3)
+        st = pstate(s)
+        check("popup: search with no match shows the no-results message",
+              len(st["items"]) == 0 and "No voucher matches" in st["empty"],
+              st["empty"])
+
+        s.page_js("var si = document.getElementById('searchInput');"
+                  "si.value = ''; si.dispatchEvent(new Event('input'));"
+                  "return 'ok';")
+        time.sleep(0.3)
+        check("popup: clearing the search restores the full list",
+              len(list_codes()) == 8, list_codes())
 
         # a voucher expiring today counts as valid through the end of its
         # expiry day (date-only strings must not be parsed as UTC, which

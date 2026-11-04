@@ -100,7 +100,8 @@ label {
 
 input[type="text"],
 input[type="number"],
-input[type="date"] {
+input[type="date"],
+input[type="search"] {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--input-border);
@@ -113,10 +114,16 @@ input[type="date"] {
 
 input[type="text"]:focus,
 input[type="number"]:focus,
-input[type="date"]:focus {
+input[type="date"]:focus,
+input[type="search"]:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+}
+
+/* Search box above the voucher list */
+.search-input {
+  margin: 0 0 8px 0;
 }
 
 /* Expiration date row: text input + calendar toggle button */

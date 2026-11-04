@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const submitBtn = document.getElementById('submitBtn');
   const cancelEditBtn = document.getElementById('cancelEditBtn');
   const sortSelect = document.getElementById('sortOrder');
+  const searchInput = document.getElementById('searchInput');
   const removeExpiredBtn = document.getElementById('removeExpiredBtn');
   const menuBtn = document.getElementById('menuBtn');
   const menuPanel = document.getElementById('menuPanel');
@@ -76,6 +77,9 @@ document.addEventListener('DOMContentLoaded', function() {
       sortByValue: 'By value',
       sortOrder: 'Sort order',
       emptyMessage: 'No vouchers yet. Add one above!',
+      searchPlaceholder: 'Search by code or amount\u2026',
+      searchLabel: 'Search vouchers',
+      noResults: 'No voucher matches \u201c{q}\u201d.',
       sncfLinkTitle: 'Use your vouchers on SNCF Connect',
       statsTotal: 'Total',
       statsValid: 'Valid',
@@ -210,6 +214,9 @@ document.addEventListener('DOMContentLoaded', function() {
       sortByValue: 'Par valeur',
       sortOrder: 'Ordre de tri',
       emptyMessage: 'Aucun bon pour l\u2019instant. Ajoutez-en un ci-dessus !',
+      searchPlaceholder: 'Rechercher par code ou montant\u2026',
+      searchLabel: 'Rechercher des bons',
+      noResults: 'Aucun bon ne correspond \u00e0 \u00ab {q} \u00bb.',
       sncfLinkTitle: 'Utilisez vos bons sur SNCF Connect',
       statsTotal: 'Total',
       statsValid: 'Valides',
@@ -1047,18 +1054,28 @@ document.addEventListener('DOMContentLoaded', function() {
     startEdit(btn.dataset.id);
   });
 
-  // Load vouchers from storage, applying the remembered sort order
+  // Load vouchers from storage, applying the remembered sort order.
+  // allVouchers caches the last read so the search box can re-render
+  // on every keystroke without hitting storage again
+  let allVouchers = [];
+
   function loadVouchers() {
     browser.storage.local.get(['vouchers', 'sortOrder']).then(function(data) {
       sortSelect.value =
           (data.sortOrder === 'code' || data.sortOrder === 'value')
               ? data.sortOrder : 'date';
-      renderVouchers(data.vouchers || []);
+      allVouchers = data.vouchers || [];
+      renderVouchers(allVouchers);
     });
   }
 
   sortSelect.addEventListener('change', function() {
     browser.storage.local.set({ sortOrder: sortSelect.value }).then(loadVouchers);
+  });
+
+  // Live filter: re-render on every keystroke
+  searchInput.addEventListener('input', function() {
+    renderVouchers(allVouchers);
   });
 
   // Create an element with optional class and text
@@ -1204,9 +1221,33 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Render vouchers in the list, sorted by date, code or value
+  // Accent-insensitive lowercase form used for search matching
+  function normalizeText(s) {
+    return (s || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  // A voucher matches the search when the query appears in its code
+  // or amount
+  function matchesSearch(voucher, query) {
+    const q = normalizeText(query);
+    if (!q) return true;
+    return normalizeText(voucher.code).indexOf(q) !== -1 ||
+           (voucher.amount !== undefined && voucher.amount !== null &&
+            String(voucher.amount).indexOf(q) !== -1);
+  }
+
+  // Render vouchers in the list, filtered by the search box and sorted
+  // by date, code or value
   function renderVouchers(vouchers) {
-    const sorted = vouchers.slice();
+    // The search box is pointless with fewer than two vouchers
+    searchInput.hidden = vouchers.length < 2;
+
+    const query = searchInput.value.trim();
+    const visible = query
+        ? vouchers.filter(function(v) { return matchesSearch(v, query); })
+        : vouchers;
+    const sorted = visible.slice();
     if (sortSelect.value === 'code') {
       sorted.sort((a, b) => a.code.localeCompare(b.code));
     } else if (sortSelect.value === 'value') {
@@ -1222,7 +1263,7 @@ document.addEventListener('DOMContentLoaded', function() {
       sorted.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
     }
 
-    if (sorted.length === 0) {
+    if (vouchers.length === 0) {
       voucherList.replaceChildren(buildNode('p', 'empty-message', t('emptyMessage')));
       totalVouchersSpan.textContent = '0';
       validVouchersSpan.textContent = '0';
@@ -1281,7 +1322,11 @@ document.addEventListener('DOMContentLoaded', function() {
       frag.appendChild(item);
     });
 
-    voucherList.replaceChildren(frag);
+    // A filter that excludes everything says so instead of showing a
+    // blank list
+    voucherList.replaceChildren(sorted.length === 0
+        ? buildNode('p', 'empty-message', t('noResults', { q: query }))
+        : frag);
     totalVouchersSpan.textContent = vouchers.length;
     validVouchersSpan.textContent = validCount;
     let valueText = String(Math.round(validValue * 100) / 100);
