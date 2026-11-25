@@ -1808,6 +1808,25 @@ def phase_b():
         s.close()
 
 
+def _chromium_build_script():
+    """Resolve the Chromium build script, or None when unavailable.
+
+    The build/release tooling is private to the maintainer; phases a/b are
+    fully self-contained. Resolution order: tools/build-chrome.py in this
+    repo (legacy layout), $WAGONBAR_BUILD_CHROME, then the private wrapper
+    in schatzy/internal-repos/wagonbar/tools/."""
+    candidates = [
+        os.path.join(REPO, "tools", "build-chrome.py"),
+        os.environ.get("WAGONBAR_BUILD_CHROME", ""),
+        os.path.join(os.path.expanduser("~"), "projects", "schatzy",
+                     "internal-repos", "wagonbar", "tools", "build-chrome.py"),
+    ]
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    return None
+
+
 def phase_c():
     """Chromium load smoke: build the Chromium package and load it in
     headless Edge (or CHROME_BIN). The extension's service worker must
@@ -1818,8 +1837,12 @@ def phase_c():
     with taskkill /T: Edge's real browser process survives a plain
     terminate() of the launcher, and an orphan holding the port makes
     the next run query the previous instance's targets."""
-    subprocess.run([sys.executable, os.path.join(REPO, "tools", "build-chrome.py")],
-                   check=True)
+    build_script = _chromium_build_script()
+    if build_script is None:
+        print("phase c skipped: Chromium build tooling is private "
+              "(set WAGONBAR_BUILD_CHROME to a build-chrome.py path)", flush=True)
+        return
+    subprocess.run([sys.executable, build_script], check=True)
     build_dir = os.path.join(REPO, "dist", "chrome-unpacked")
     chrome_bin = os.environ.get("CHROME_BIN") or \
         r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"

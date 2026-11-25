@@ -74,7 +74,8 @@ Not covered: the toolbar popup panel itself (not automatable), badge
 colors (not exposed as DOM attributes).
 
 - Chromium load smoke (phase c): builds the Chromium package
-  (`tools/build-chrome.py`) and loads it in headless Edge (or
+  (private build tooling — the phase skips cleanly without it; set
+  `WAGONBAR_BUILD_CHROME` to a build-chrome.py path to run it) and loads it in headless Edge (or
   `CHROME_BIN`); asserts the extension is accepted and its MV3 service
   worker starts, via the DevTools target list. The debug port is
   ephemeral and the browser process tree is force-killed afterwards

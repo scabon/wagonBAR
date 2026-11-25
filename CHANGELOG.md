@@ -2,8 +2,8 @@
 
 All notable changes to wagonBar are documented here. This file is the
 source of truth for the popup's Changelog view: the English entries in
-`extension/popup/popup.js` must match it exactly (checked by
-`tools/check-changelog.py`, run in CI), and the French entries are a
+`extension/popup/popup.js` must match it exactly (checked by the
+release tooling), and the French entries are a
 manual translation of the same items.
 
 When releasing a new version:
@@ -12,7 +12,7 @@ When releasing a new version:
 2. mirror the same items into the English `changelogEntries` in
    `extension/popup/popup.js` and translate them into the French block;
 3. bump `"version"` in `extension/manifest.json` to match the new section;
-4. run `python tools/check-changelog.py`.
+4. run the changelog sync check.
 
 ## [1.7.1] — 2026-11-01
 

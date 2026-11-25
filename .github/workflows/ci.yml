@@ -17,10 +17,8 @@ jobs:
         # exits non-zero on errors; warnings are reported but tolerated
         run: npx --yes web-ext lint --source-dir extension
 
-      - name: Changelog sync
-        # CHANGELOG.md must match the popup's changelogEntries and the
-        # manifest version (French entries are a manual translation)
-        run: python3 tools/check-changelog.py
+      # The changelog sync check (CHANGELOG.md vs popup changelogEntries vs
+      # manifest version) runs in the maintainer's private release tooling.
 
   e2e:
     runs-on: windows-latest
