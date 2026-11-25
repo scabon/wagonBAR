@@ -1250,6 +1250,7 @@ def popup_tests(s):
               and about["madeBy"] == "Made by: cabon14.com"
               and about["links"] == [["about-site", "https://cabon14.com/"],
                                     ["about-site", "mailto:support@cabon14.com"],
+                                    ["about-source", "https://github.com/scabon/wagonBAR"],
                                     ["rate-store", "https://addons.mozilla.org/addon/wagonbar/"],
                                     ["donate-liberapay", "https://liberapay.com/cabon14/"],
                                     ["donate-tipeee", "https://en.tipeee.com/cabon14/"]],
@@ -1295,9 +1296,9 @@ def popup_tests(s):
             " top: document.querySelector('#changelogContent ul li').textContent});"))
         check("menu: Changelog lists the version history",
               cl["hidden"] is False
-              and cl["versions"] == ["1.7.1", "1.7", "1.6", "1.5", "1.4", "1.3",
+              and cl["versions"] == ["1.7.2", "1.7.1", "1.7", "1.6", "1.5", "1.4", "1.3",
                                      "1.0 \u2013 1.2"]
-              and "Export your vouchers" in cl["top"], cl)
+              and "Source link to the GitHub repository" in cl["top"], cl)
         s.page_js("document.querySelector('#view-changelog .back-btn').click(); return 'ok';")
 
         # language switch to French, from the Settings view

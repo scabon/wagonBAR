@@ -136,6 +136,8 @@ document.addEventListener('DOMContentLoaded', function() {
           items: [] }
       ],
       changelogEntries: [
+                { version: '1.7.2',
+          items: ['Added a Source link to the GitHub repository in the About view.'] },
                 { version: '1.7.1',
           items: ['Export your vouchers to a JSON file (backup) and import them back — Settings → Export / Import. Exports carry the SNCF Connect site, so they also import as-is into bandWagon.',
                   'Fixed: the import file picker did not open on Firefox (hidden file input; now rendered off-screen).'] },
@@ -169,6 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
       aboutSite: 'cabon14.com',
       supportLabel: 'Support:',
       supportEmail: 'support@cabon14.com',
+      sourceLabel: 'Source:',
       donateTitle: 'Support wagonBar',
       donateLiberapay: 'Donate on Liberapay',
       donateTipeee: 'Tip on Tipeee',
@@ -273,6 +276,8 @@ document.addEventListener('DOMContentLoaded', function() {
           items: [] }
       ],
       changelogEntries: [
+                { version: '1.7.2',
+          items: ['Ajout d’un lien Source vers le dépôt GitHub dans la vue À propos.'] },
                 { version: '1.7.1',
           items: ['Exportez vos bons dans un fichier JSON (sauvegarde) et r\u00e9importez-les \u2014 Param\u00e8tres \u2192 Exporter / Importer. Les exports portent le site SNCF Connect, donc ils s\u2019importent tels quels dans bandWagon.',
                   'Corrig\u00e9 : le s\u00e9lecteur de fichier de l\u2019import ne s\u2019ouvrait pas sur Firefox (input cach\u00e9 ; rendu hors \u00e9cran maintenant).'] },
@@ -306,6 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
       aboutSite: 'cabon14.com',
       supportLabel: 'Assistance :',
       supportEmail: 'support@cabon14.com',
+      sourceLabel: 'Source :',
       donateTitle: 'Soutenir wagonBar',
       donateLiberapay: 'Soutenir sur Liberapay',
       donateTipeee: 'Pourboire sur Tipeee',
@@ -325,6 +331,7 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   // Donation links (see AGENTS.md, Donations section)
+  const SOURCE_URL = 'https://github.com/scabon/wagonBAR';
   const DONATION_LIBERAPAY = 'https://liberapay.com/cabon14/';
   // Tipeee serves a French UI on fr.tipeee.com and an English UI on
   // en.tipeee.com (same campaign) — pick per popup language.
@@ -709,6 +716,17 @@ document.addEventListener('DOMContentLoaded', function() {
     supportLine.appendChild(document.createTextNode(' '));
     supportLine.appendChild(support);
 
+    const source = document.createElement('a');
+    source.href = SOURCE_URL;
+    source.target = '_blank';
+    source.rel = 'noopener noreferrer';
+    source.className = 'about-source';
+    source.textContent = 'github.com/scabon/wagonBAR';
+    const sourceLine = buildNode('p');
+    sourceLine.appendChild(buildNode('span', '', t('sourceLabel')));
+    sourceLine.appendChild(document.createTextNode(' '));
+    sourceLine.appendChild(source);
+
     const rate = document.createElement('a');
     rate.href = storeRatingUrl();
     rate.target = '_blank';
@@ -736,7 +754,7 @@ document.addEventListener('DOMContentLoaded', function() {
     donateRow.appendChild(tipeee);
 
     aboutContent.replaceChildren(name, versionNode, tagline, note,
-                                 siteLine, supportLine, rateLine,
+                                 siteLine, supportLine, sourceLine, rateLine,
                                  donateTitle, donateRow);
   }
 
