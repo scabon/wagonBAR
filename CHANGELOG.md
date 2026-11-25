@@ -16,7 +16,7 @@ When releasing a new version:
 
 ## [1.7.2] — 2026-11-25
 
-- Added a Source link to the GitHub repository in the About view.
+- Added a Source link to the GitHub repository in the About view, styled like the other About links (accent color, visited state included).
 
 ## [1.7.1] — 2026-11-01
 

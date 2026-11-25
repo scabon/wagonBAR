@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ],
       changelogEntries: [
                 { version: '1.7.2',
-          items: ['Added a Source link to the GitHub repository in the About view.'] },
+          items: ['Added a Source link to the GitHub repository in the About view, styled like the other About links (accent color, visited state included).'] },
                 { version: '1.7.1',
           items: ['Export your vouchers to a JSON file (backup) and import them back — Settings → Export / Import. Exports carry the SNCF Connect site, so they also import as-is into bandWagon.',
                   'Fixed: the import file picker did not open on Firefox (hidden file input; now rendered off-screen).'] },

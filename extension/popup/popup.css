@@ -678,7 +678,11 @@ select {
 }
 
 .about-site,
-.rate-store {
+.about-source,
+.rate-store,
+.about-site:visited,
+.about-source:visited,
+.rate-store:visited {
   font-size: 13px;
   color: var(--accent);
   text-decoration: none;
