@@ -56,6 +56,12 @@ import urllib.request
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def days_from_now(days):
+    """ISO date today + days. E2e voucher dates must stay relative to today:
+    the add form rejects past dates, so hardcoded dates rot over time."""
+    return (date.today() + timedelta(days=days)).isoformat()
 EXT_DIR = os.path.join(REPO, "extension")
 POPUP_DIR = os.path.join(EXT_DIR, "popup")
 ADDON_ID = "wagonbar@scabon.com"
@@ -1345,7 +1351,7 @@ def popup_tests(s):
              "expiryDate": "2027-01-01",
              "createdAt": "2026-09-29T00:00:00.000Z"},
             {"id": "seed-n-2", "code": "E2E-NOTIF-2",
-             "expiryDate": "2026-12-01",
+             "expiryDate": days_from_now(30),  # far enough to stay out of the 7-day lead window
              "createdAt": "2026-09-29T00:00:00.000Z"},
             {"id": "seed-n-3", "code": "E2E-OLDEXP-9",
              "expiryDate": "2020-01-01",
@@ -1355,12 +1361,12 @@ def popup_tests(s):
         tab_complete(11, "https://www.sncf-connect.com/")
         time.sleep(0.8)
         st = pstate(s)
-        days_to_nearest = (date(2026, 12, 1) - date.today()).days
+        days_to_nearest = 30
         check("notify: SNCF arrival fires one notification with the valid count",
               len(st["notifications"]) == 1
               and st["notifications"][0]["title"] == "wagonBar"
               and "You have 2 valid vouchers" in st["notifications"][0]["message"]
-              and "2026-12-01" in st["notifications"][0]["message"]
+              and days_from_now(30) in st["notifications"][0]["message"]
               and ("(in %d days)" % days_to_nearest)
               in st["notifications"][0]["message"],
               st["notifications"])
@@ -1540,7 +1546,7 @@ def popup_tests(s):
         s.client.navigate(url)
         time.sleep(1)
 
-        popup_add(s, "E2E-VAL-1", "2026-11-11", "25")
+        popup_add(s, "E2E-VAL-1", days_from_now(30), "25")
         time.sleep(0.6)
         st = pstate(s)
         rec = next(v for v in st["store"] if v["code"] == "E2E-VAL-1")
@@ -1549,7 +1555,7 @@ def popup_tests(s):
               and "25 \u20ac" in st["items"][0]["text"],
               (rec, st["items"][0]["text"]))
 
-        popup_add(s, "E2E-NOVAL-1", "2026-11-12")
+        popup_add(s, "E2E-NOVAL-1", days_from_now(31))
         time.sleep(0.6)
         st = pstate(s)
         rec = next(v for v in st["store"] if v["code"] == "E2E-NOVAL-1")
@@ -1558,7 +1564,7 @@ def popup_tests(s):
               and "\u20ac" not in st["items"][1]["text"],
               (rec, st["items"][1]["text"]))
 
-        popup_add(s, "E2E-BADVAL-1", "2026-11-13", "abc")
+        popup_add(s, "E2E-BADVAL-1", days_from_now(32), "abc")
         time.sleep(0.6)
         st = pstate(s)
         check("value: an invalid amount is rejected inline, nothing added",
